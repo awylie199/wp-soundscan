@@ -1,0 +1,12 @@
+.wss-dates {
+    align-items: center;
+    display: flex;
+
+    > *:not(:last-child) {
+        margin-right: .5em;
+    }
+
+    > label {
+        font-weight: bolder;
+    }
+}

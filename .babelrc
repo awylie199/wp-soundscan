@@ -1,0 +1,15 @@
+{
+    "presets": [
+        [
+            "env",
+            {
+                "targets": {
+                    "uglify": false
+                }
+            }
+        ]
+    ],
+    "plugins": [
+        "transform-runtime"
+    ]
+  }
