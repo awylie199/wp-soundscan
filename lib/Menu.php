@@ -237,7 +237,7 @@ if (!class_exists('AW\WSS\Menu')) {
 
             ?>
             <?php if (count($rows) || (count($this->formatter->invalids))) : ?>
-            <table>
+            <table class="report-results">
                 <thead>
                     <tr>
                         <th>
@@ -282,7 +282,7 @@ if (!class_exists('AW\WSS\Menu')) {
                 ?>
             </p>
             <?php if (count($this->formatter->invalids)) : ?>
-            <table>
+            <table class="invalid-results">
                 <thead>
                     <tr>
                         <th>
@@ -314,10 +314,7 @@ if (!class_exists('AW\WSS\Menu')) {
             <?php endif; ?>
             <?php else : ?>
                 <?php $this->outputNoResultsHTML(); ?>
-                <?php if (empty($this->formatter->chainNo) || empty($this->formatter->accountNo) ||
-                    empty($this->formatter->musicCategory) || empty($this->idAttribute) ||
-                        ($this->formatter::FORMATTER_TYPE === 'digital') &&
-                            empty($this->formatter->isrcAttribute)) : ?>
+                <?php if (!$this->formatter->hasNecessaryOptions()) : ?>
                     <p>
                         <?php
                             printf(

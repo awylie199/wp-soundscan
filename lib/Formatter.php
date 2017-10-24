@@ -42,6 +42,18 @@ if (!class_exists('AW\WSS\Formatter')) {
         protected $musicCategory = '';
 
         /**
+         * WooCommerce SubCategory Name for Albums
+         * @var string
+         */
+        private $albumCategory = '';
+
+        /**
+         * WooCommerce SubCategory Name for Singles (Tracks)
+         * @var string
+         */
+        private $trackCategory = '';
+
+        /**
          * WooCommerce Logger
          * @var null|\WC_Logger
          */
@@ -87,6 +99,8 @@ if (!class_exists('AW\WSS\Formatter')) {
                 $this->chainNo = $this->options[Settings::CHAIN_NO];
                 $this->idAttribute = $this->options[Settings::EAN_ATTRIBUTE] ?? '';
                 $this->musicCategory = $this->options[Settings::MUSIC_CATEGORY] ?? '';
+                $this->albumCategory = $this->options[Settings::ALBUM_CATEGORY] ?? '';
+                $this->trackCategory = $this->options[Settings::TRACK_CATEGORY] ?? '';
 
                 if (!$this->idAttribute) {
                     // Fallback to UPC if the EAN is not available.
@@ -151,9 +165,13 @@ if (!class_exists('AW\WSS\Formatter')) {
          * @param float  $price       Price For Line Item
          * @return bool               True if price is greater than $4.99
          */
-        protected function isExpensiveEnough(float $price): bool
+        protected function isExpensiveEnough(float $price, string $type): bool
         {
-            return $price > 4.99;
+            if ($type === 'album') {
+                return (round($price, 2) > $this->minAlbumPrice);
+            } elseif ($type === 'track') {
+                return (round($price, 2) > $this->minTrackPrice);
+            }
         }
 
         /**
@@ -179,7 +197,7 @@ if (!class_exists('AW\WSS\Formatter')) {
 
             if ($country === 'US') {
                 $zip = substr(trim(preg_replace(
-                    "/[^A-Za-z0-9 ]/",
+                    "/[^A-Za-z0-9]/",
                     '',
                     $order->get_shipping_postcode()
                 )), 0, 5);
@@ -190,7 +208,7 @@ if (!class_exists('AW\WSS\Formatter')) {
 
                 if ($country === 'US') {
                     $zip = substr($zip, trim(preg_replace(
-                        "/[^A-Za-z0-9 ]/",
+                        "/[^A-Za-z0-9]/",
                         '',
                         $order->get_billing_postcode()
                     )), 0, 5);
@@ -239,7 +257,7 @@ if (!class_exists('AW\WSS\Formatter')) {
 
         /**
          * Checks Whether Item is Music From Category
-         * @param int  $id   WooCommerce Product
+         * @param int  $id                       WooCommerce Product ID
          * @return bool                          True if Music Item
          */
         protected function isMusic(int $id): bool
@@ -266,6 +284,88 @@ if (!class_exists('AW\WSS\Formatter')) {
         public function getInvalidResults(): array
         {
             return $this->invalids;
+        }
+
+        /**
+         * True if Product Item is Digital
+         * @param \WC_Product $product  WC Order Product
+         * @return bool                 True if the Item is Digital
+         */
+        protected function isDigital(\WC_Product $product): bool
+        {
+            return $product->is_virtual();
+        }
+
+        /**
+         * Is the Record Valid for Including in the Report?
+         * @param \WC_Order_Item_Product  $item     Current Product Item
+         * @param string    $zip                    Current Product Custom ZIP
+         * @param float     $price                  Current Product Sale Price
+         * @param string    $type                   Current Product Album or Track
+         * @return bool                             True if Valid
+         */
+        protected function isValid(
+            \WC_Order_Item_Product $item,
+            string $zip,
+            float $price,
+            string $type
+        ): bool {
+            if (!$this->isValidZIP($zip)) {
+                $this->invalids[] = [
+                    'record'    =>  $item,
+                    'reason'    =>  __(
+                        'The customer must have a valid U.S. zipcode for their billing or delivery addresses.',
+                        'woocommerce-soundscan'
+                    )
+                ];
+
+                return false;
+            }
+
+            if (!$this->isExpensiveEnough($price, $type)) {
+                $this->invalids[] = [
+                    'record'    =>  $item,
+                    'reason'    =>  printf(
+                        __(
+                            'The item does not qualify as expensive enough. Adjust the minimum price %$1ssettings%$2s if required.',
+                            'woocommerce-soundscan'
+                        ),
+                        '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
+                        '</a>'
+                    )
+                ];
+
+                return false;
+            }
+
+            return true;
+        }
+
+        /**
+         * Gets the Item's Type - Album or Track
+         * @param int  $id      WooCommerce Product ID
+         * @return string       The type - 'album' or 'track', or '' of neither
+         */
+        protected function getType(int $id): string
+        {
+            $itemCategoryTerms = wp_get_post_terms(
+                $id,
+                'product_cat'
+            );
+
+            if (!is_array($itemCategoryTerms) || empty($itemCategoryTerms)) {
+                return '';
+            } else {
+                $names = array_column($itemCategoryTerms, 'name');
+
+                if (in_array($this->albumCategory, $names)) {
+                    return 'album';
+                } elseif (in_array($this->trackCategory, $names)) {
+                    return 'track';
+                } else {
+                    return '';
+                }
+            }
         }
     }
 } else {

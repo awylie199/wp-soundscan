@@ -1,3 +1,5 @@
+$white: #fff;
+
 .wss-dates {
     align-items: center;
     display: flex;
@@ -9,4 +11,19 @@
     > label {
         font-weight: bolder;
     }
+}
+
+.report-results,
+.invalid-results {
+    background: $white;
+    padding: .5em;
+
+    th,
+    td {
+        padding: .25em .5em;
+    }
+}
+
+.invalid-results {
+    text-align: center;
 }

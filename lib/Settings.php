@@ -74,6 +74,18 @@ if (!class_exists('AW\WSS\Settings')) {
         const MUSIC_CATEGORY = 'wcCategory';
 
         /**
+         * Option Name for WooCommerce SubCategory for Albums
+         * @var string
+         */
+        const ALBUM_CATEGORY = 'albumCategory';
+
+        /**
+         * Option Name for WooCommerce SubCategory for Tracks (Singles)
+         * @var string
+         */
+        const TRACK_CATEGORY = 'trackCategory';
+
+        /**
          * Option Name for WooCommerce Attribute for Product ISRC
          * @var string
          */
@@ -90,6 +102,30 @@ if (!class_exists('AW\WSS\Settings')) {
          * @var string
          */
         const EAN_ATTRIBUTE = 'eanAttribute';
+
+        /**
+         * Option Name for Minimum Digital Track Price
+         * @var string
+         */
+        const DIGITAL_TRACK_MIN_PRICE = 'digitalTrackMinPrice';
+
+        /**
+         * Option Name for Minimum Physical Track Price
+         * @var string
+         */
+        const PHYSICAL_TRACK_MIN_PRICE = 'physicalTrackMinPrice';
+
+        /**
+         * Option Name for Minimum Digital Album Price
+         * @var string
+         */
+        const DIGITAL_ALBUM_MIN_PRICE = 'digitalAlbumMinPrice';
+
+        /**
+         * Option Name for Minimum Physical Album Price
+         * @var string
+         */
+        const PHYSICAL_ALBUM_MIN_PRICE = 'physicalAlbumMinPrice';
 
         /**
          * Nielsen Soundscan FTP Host Address
@@ -146,6 +182,17 @@ if (!class_exists('AW\WSS\Settings')) {
         private $wcCategory = '';
 
         /**
+         * WooCommerce SubCategory for Tracks (Singles)
+         * @var string
+         */
+        private $trackCategory = '';
+
+        /**
+         * WooCommerce SubCategory for Albums
+         */
+        private $albumCategory = '';
+
+        /**
          * WooCommerce Attribute for EAN
          * @var string
          */
@@ -162,6 +209,30 @@ if (!class_exists('AW\WSS\Settings')) {
          * @var string
          */
         private $isrcAttribute = '';
+
+        /**
+         * Minimum Price for a Qualifying Digital Track
+         * @var float
+         */
+        private $digitalMinTrackPrice = 0.39;
+
+        /**
+         * Minimum Price for a Qualifying Digital Track
+         * @var float
+         */
+        private $digitalMinAlbumPrice = 3.49;
+
+        /**
+         * Minimum Price for a Qualifying Physical Track
+         * @var float
+         */
+        private $physicalMinTrackPrice = 4.99;
+
+        /**
+         * Minimum Price for a Qualifying Physical Album
+         * @var float
+         */
+        private $physicalMinAlbumPrice = 4.99;
 
         public function __construct()
         {
@@ -184,6 +255,8 @@ if (!class_exists('AW\WSS\Settings')) {
             $this->physicalAccount = $this->get_option(self::ACCOUNT_NO_PHYSICAL, '');
             $this->digitalAccount = $this->get_option(self::ACCOUNT_NO_DIGITAL, '');
             $this->wcCategory = $this->get_option(self::MUSIC_CATEGORY, '');
+            $this->trackCategory = $this->get_option(self::TRACK_CATEGORY, '');
+            $this->albumCategory = $this->get_option(self::ALBUM_CATEGORY, '');
             $this->isrcAttribute = $this->get_option(self::ISRC_ATTRIBUTE, '');
             $this->eanAttribute = $this->get_option(self::EAN_ATTRIBUTE, '');
             $this->upcAttribute = $this->get_option(self::UPC_ATTRIBUTE, '');
@@ -308,9 +381,33 @@ if (!class_exists('AW\WSS\Settings')) {
                         'Music Product Category',
                         'woocommerce-soundscan'
                     ),
-                    'type'              => 'categories',
+                    'type'              => 'music',
                     'description'       => __(
-                        'The WooCommerce category for music albums and singles. Required for all physical and digital sales.',
+                        'The WooCommerce product category for music. Required for all physical and digital sales reporting.',
+                        'woocommerce-soundscan'
+                    ),
+                    'desc_tip'          => true,
+                ],
+                'trackCategory'         =>  [
+                    'title'             => __(
+                        'Product Track (Single) Subcategory',
+                        'woocommerce-soundscan'
+                    ),
+                    'type'              => 'track',
+                    'description'       => __(
+                        'The WooCommerce product subcategory for music tracks (singles). Required for digital sales reporting.',
+                        'woocommerce-soundscan'
+                    ),
+                    'desc_tip'          => true,
+                ],
+                'albumCategory'         =>  [
+                    'title'             => __(
+                        'Product Album Subcategory',
+                        'woocommerce-soundscan'
+                    ),
+                    'type'              => 'album',
+                    'description'       => __(
+                        'The WooCommerce product category for music albums. Required for digital sales reporting.',
                         'woocommerce-soundscan'
                     ),
                     'desc_tip'          => true,
@@ -350,15 +447,119 @@ if (!class_exists('AW\WSS\Settings')) {
                         'woocommerce-soundscan'
                     ),
                     'desc_tip'          => true,
+                ],
+                'digitalTrackMinPrice'  =>  [
+                    'title'             => __(
+                        'Digital Track (Single) Minimum Price',
+                        'woocommerce-soundscan'
+                    ),
+                    'type'              => 'number',
+                    'description'       => __(
+                        'To qualify for Soundscan Reporting the sale must be for a mimimum amount. Up to date figures can be obtained from Nielsen.',
+                        'woocommerce-soundscan'
+                    ),
+                    'desc_tip'          => true,
+                    'default'           => 0.39
+                ],
+                'physicalTrackMinPrice' =>  [
+                    'title'             => __(
+                        'Digital Track (Single) Minimum Price',
+                        'woocommerce-soundscan'
+                    ),
+                    'type'              => 'number',
+                    'description'       => __(
+                        'To qualify for Soundscan Reporting the sale must be for a mimimum amount. Up to date figures can be obtained from Nielsen.',
+                        'woocommerce-soundscan'
+                    ),
+                    'desc_tip'          => true,
+                    'default'           => 4.99
+                ],
+                'digitalAlbumMinPrice'  =>  [
+                    'title'             => __(
+                        'Digital Album Minimum Price',
+                        'woocommerce-soundscan'
+                    ),
+                    'type'              => 'number',
+                    'description'       => __(
+                        'To qualify for Soundscan Reporting the sale must be for a mimimum amount. Up to date figures can be obtained from Nielsen.',
+                        'woocommerce-soundscan'
+                    ),
+                    'desc_tip'          => true,
+                    'default'           => 3.49
+                ],
+                'phyiscalAlbumMinPrice' =>  [
+                    'title'             => __(
+                        'Physical Album Minimum Price',
+                        'woocommerce-soundscan'
+                    ),
+                    'type'              => 'number',
+                    'description'       => __(
+                        'To qualify for Soundscan Reporting the sale must be for a mimimum amount. Up to date figures can be obtained from Nielsen.',
+                        'woocommerce-soundscan'
+                    ),
+                    'desc_tip'          => true,
+                    'default'           => 4.99
                 ]
             ];
         }
 
         /**
-         * Generate the Field HTML for Listing the WC Categories
+         * Generate the Field HTML for Listing the WC Categories for Tracks
+         * @param string    $key       WC Field Key
+         * @param mixed[]   $data      WC Field Data Attributes
+         * @return string              WC Integration HTML for Category Field
          */
-        public function generate_categories_html(string $key, array $data): string
+        public function generate_track_html(string $key, array $data): string
         {
+            return $this->generateMusicCategoriesHTML(
+                $key,
+                $data,
+                self::TRACK_CATEGORY
+            );
+        }
+
+        /**
+         * Generate the Field HTML for Listing the WC Categories for Albums
+         * @param string    $key       WC Field Key
+         * @param mixed[]   $data      WC Field Data Attributes
+         * @return string              WC Integration HTML for Category Field
+         */
+        public function generate_album_html(string $key, array $data): string
+        {
+            return $this->generateMusicCategoriesHTML(
+                $key,
+                $data,
+                self::ALBUM_CATEGORY
+            );
+        }
+
+        /**
+         * Generate the Field HTML for Listing the WC Categories for Music
+         * @param string    $key       WC Field Key
+         * @param mixed[]   $data      WC Field Data Attributes
+         * @return string              WC Integration HTML for Category Field
+         */
+        public function generate_music_html(string $key, array $data): string
+        {
+            return $this->generateMusicCategoriesHTML(
+                $key,
+                $data,
+                self::MUSIC_CATEGORY
+            );
+        }
+
+        /**
+         * Generate the Field HTML for Listing the WC Categories
+         * @param string    $key       WC Field Key
+         * @param mixed[]   $data      WC Field Data Attributes
+         * @param string    $option    WC Soundscan Option Name
+         * @return string              WC Integration HTML for Category Field
+         */
+        public function generateMusicCategoriesHTML(
+            string $key,
+            array $data,
+            string $option
+        ): string {
             $field = $this->plugin_id . $this->id . '_' . $key;
             $defaults = [
                 'class'             => '',
@@ -396,7 +597,7 @@ if (!class_exists('AW\WSS\Settings')) {
                                 <select class="<?php echo esc_attr($data['class']); ?>" name="<?php echo esc_attr($field); ?>" style="<?php echo esc_attr($data['css']); ?>" <?php echo $this->get_custom_attribute_html($data); ?>>
                                     <option value=""></option>
                                     <?php foreach ($categories as $cat) : ?>
-                                        <option <?php selected($cat->name, $this->get_option(self::MUSIC_CATEGORY)); ?> value="<?php echo esc_attr($cat->name); ?>">
+                                        <option <?php selected($cat->name, $this->get_option($option)); ?> value="<?php echo esc_attr($cat->name); ?>">
                                             <?php printf(esc_html__('%s', 'woocommerce-soundscan'), $cat->name); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -408,7 +609,6 @@ if (!class_exists('AW\WSS\Settings')) {
                 </tbody>
             </table>
             <?php
-            ob_end_flush();
 
             return $html;
         }
@@ -490,6 +690,50 @@ if (!class_exists('AW\WSS\Settings')) {
                 $cleanSettings[self::MUSIC_CATEGORY] = sanitize_text_field(
                     $settings[self::MUSIC_CATEGORY]
                 );
+            }
+
+            if (isset($settings[self::TRACK_CATEGORY])) {
+                $cleanSettings[self::TRACK_CATEGORY] = sanitize_text_field(
+                    $settings[self::TRACK_CATEGORY]
+                );
+            }
+
+            if (isset($settings[self::ALBUM_CATEGORY])) {
+                $cleanSettings[self::ALBUM_CATEGORY] = sanitize_text_field(
+                    $settings[self::ALBUM_CATEGORY]
+                );
+            }
+
+            if (isset($settings[self::DIGITAL_TRACK_MIN_PRICE])) {
+                $cleanSettings[self::DIGITAL_TRACK_MIN_PRICE] = round(filter_var(
+                    $settings[self::DIGITAL_TRACK_MIN_PRICE],
+                    FILTER_SANITIZE_NUMBER_FLOAT,
+                    FILTER_FLAG_ALLOW_FRACTION
+                ), 2);
+            }
+
+            if (isset($settings[self::PHYSICAL_TRACK_MIN_PRICE])) {
+                $cleanSettings[self::PHYSICAL_TRACK_MIN_PRICE] = round(filter_var(
+                    $settings[self::PHYSICAL_TRACK_MIN_PRICE],
+                    FILTER_SANITIZE_NUMBER_FLOAT,
+                    FILTER_FLAG_ALLOW_FRACTION
+                ), 2);
+            }
+
+            if (isset($settings[self::DIGITAL_ALBUM_MIN_PRICE])) {
+                $cleanSettings[self::DIGITAL_ALBUM_MIN_PRICE] = round(filter_var(
+                    $settings[self::DIGITAL_ALBUM_MIN_PRICE],
+                    FILTER_SANITIZE_NUMBER_FLOAT,
+                    FILTER_FLAG_ALLOW_FRACTION
+                ), 2);
+            }
+
+            if (isset($settings[self::PHYSICAL_ALBUM_MIN_PRICE])) {
+                $cleanSettings[self::PHYSICAL_ALBUM_MIN_PRICE] = round(filter_var(
+                    $settings[self::PHYSICAL_ALBUM_MIN_PRICE],
+                    FILTER_SANITIZE_NUMBER_FLOAT,
+                    FILTER_FLAG_ALLOW_FRACTION
+                ), 2);
             }
 
             return $cleanSettings;

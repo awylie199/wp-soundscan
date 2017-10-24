@@ -33,12 +33,6 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
         const TRAILER_DELIMETER = '|';
 
         /**
-         * Data Manager for Handling Soundscan Records
-         * @var null|\AW\WSS\Data
-         */
-        private $data = null;
-
-        /**
          * Assigned Account Number (XXXXX)
          * @var string
          */
@@ -49,6 +43,24 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
          * @var string
          */
         public $isrcAttribute = '';
+
+        /**
+         * Data Manager for Handling Soundscan Records
+         * @var null|\AW\WSS\Data
+         */
+        private $data = null;
+
+        /**
+         * Minimum Qualifying Digital Track (Single) Price
+         * @var float
+         */
+        private $minTrackPrice = 0.0;
+
+        /**
+         * Minimum Qualifying Digital Album Price
+         * @var float
+         */
+        private $minAlbumPrice = 0.0;
 
         /**
          * @param \DateTimeImmutable $start         Start Date of the Report
@@ -64,6 +76,14 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
             $this->endDate = $end;
             $this->accountNo = $this->options[Settings::ACCOUNT_NO_DIGITAL] ?? '';
             $this->isrcAttribute = $this->options[Settings::ISRC_ATTRIBUTE] ?? '';
+            $this->minTrackPrice = round(
+                $this->options[Settings::DIGITAL_TRACK_MIN_PRICE] ?? 0,
+                2
+            );
+            $this->minAlbumPrice = round(
+                $this->options[Settings::DIGITAL_ALBUM_MIN_PRICE] ?? 0,
+                2
+            );
         }
 
         /**
@@ -73,24 +93,60 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
          */
         public function getFormattedResults(): array
         {
-            $results = [];
+            $rows = $this->data->getResults($this->startDate, $this->endDate);
 
             try {
                 $this->addHeader();
-                foreach ($rows as $record) {
-                    $ean = $this->getEANNumber($record);
-                    $price = 0;
 
-                    if ($this->isValid($price, $ean)) {
-                        $this->addRecord($record, $ean);
+                foreach ($rows as $order) {
+                    $itemCount = 1;
+                    $items = $order->get_items();
+                    $zip = $this->getZip($order);
+
+                    foreach ($items as $item) {
+                        $product = $order->get_product_from_item($item);
+                        $id = $product->get_id();
+
+                        if ($this->isMusic($id) && $this->isDigital($product)) {
+                            $price = $order->get_line_total($item, false, false);
+                            $ean = $this->getEAN($product);
+                            $type = $this->getType($id);
+                            $isrc = $this->getISRC($product);
+                            $valid = $this->isDigitalValid(
+                                $item,
+                                $price,
+                                $type,
+                                $ean,
+                                $zip,
+                                $isrc
+                            );
+
+                            if ($valid) {
+                                for ($i = 0; $i < $item['qty']; $i++) {
+                                    $this->addRecord(
+                                        $ean,
+                                        $zip,
+                                        $order->get_status(),
+                                        $price,
+                                        $itemCount,
+                                        $type,
+                                        $isrc
+                                    );
+                                    $itemCount++;
+                                }
+                            }
+                        }
+
+                        $itemCount++;
                     }
                 }
+
                 $this->addTrailer();
             } catch (\Exception $err) {
                 $this->logger->error(
                     sprintf(
                         __(
-                            'Error in Soundscan Digital Report Generation: %1$s',
+                            'Error in Soundscan Physical Report Generation: %1$s',
                             'woocommerce-soundscan'
                         ),
                         $err->getMessage()
@@ -98,7 +154,7 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
                     $this->context
                 );
             } finally {
-                return $results;
+                return $this->submission;
             }
         }
 
@@ -108,51 +164,62 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
          */
         public function hasNecessaryOptions(): bool
         {
-            return (
-                !empty($this->isrcAttribute) && !empty($this->musicCategory) &&
-                !empty($this->idAttribute)) && !empty($this->accountNo) &&
-                !empty($this->chainNo);
+            return !(
+                empty($this->isrcAttribute) || empty($this->musicCategory) ||
+                empty($this->idAttribute) || empty($this->accountNo) ||
+                empty($this->chainNo)
+            );
         }
 
         /**
          * Add a Sales Detail Record for Each Record Purchase to the Submission
          *
          * Record Number (D3)
-         * UPC Number of Selection
+         * UPC Number of Selection - Required for Albums
          * Buyer Zip Code
          * Trans Code (S/R) Sales/Return
          * Item No. in this transaction - Sequential Number of Item Within Order
-         * ISRC Code - Always Blank
-         * Price (no decimals)
-         * Type of Sale (Track =S, Album=A)
+         * ISRC Code - Required for Singles
+         * Formatted Price (no decimals)
+         * Type of Sale ('album' or 'track')
          * Strata (PC = P or Mobile = M)
          *
-         * @param array  $record     WooCommerce Record Order Meta Details
-         * @param string $ean        Record EAN
-         * @param float $price       Record Sale Line Item (excl. Tax) Price
+         * @param string $ean=''           Product EAN / UPC Number
+         * @param string $zip              Customer ZIP Code
+         * @param string $status           WooCommerce Order Status
+         * @param string $price            Line Item Price
+         * @param int    $itemCount        Sequential Order of Item Within Order
+         * @param string $type             Type of Item (Album / Track)
          * @return void
          */
-        protected function addRecord(array $record, string $ean, float $price)
-        {
-            $isComplete = $this->currentOrder->status === 'completed';
+        protected function addRecord(
+            string $ean = '',
+            string $zip,
+            string $status,
+            string $price,
+            int $itemCount,
+            string $type,
+            string $isrc
+        ) {
+            $complete = ($status === 'completed');
 
             $detailRecord = self::RECORD_NO . self::TRAILER_DELIMETER;
-            $detailRecord .= $ean . self::TRAILER_DELIMETER;
-            $detailRecord .= $this->getCleanZipCode() . self::TRAILER_DELIMETER;
-            $detailRecord .= ($isComplete ? 'S' : 'R') . self::TRAILER_DELIMETER;
+            $detailRecord .= ($type === 'album' ? $ean : '') . self::TRAILER_DELIMETER;
+            $detailRecord .= $zip . self::TRAILER_DELIMETER;
+            $detailRecord .= ($complete ? 'S' : 'R') . self::TRAILER_DELIMETER;
             $detailRecord .= $itemCount . self::TRAILER_DELIMETER;
-            $detailRecord .= self::TRAILER_DELIMETER; // Blank, no ISRC for Albums
+            $detailRecord .= ($type === 'track' ? $isrc : '') . self::TRAILER_DELIMETER;
             $detailRecord .= $this->formatPrice($price) . self::TRAILER_DELIMETER;
-            $detailRecord .= 'A' . self::TRAILER_DELIMETER; // Always Albums
+            $detailRecord .= ($type === 'album' ? 'A' : 'S') . self::TRAILER_DELIMETER;
             $detailRecord .= 'P';
 
-            if ($isComplete) {
+            if ($complete) {
                 $this->sales++;
             } else {
                 $this->refunds++;
             }
 
-            $this->submission .= trim($detailRecord) . PHP_EOL;
+            $this->submission[] = trim($detailRecord);
         }
 
         /**
@@ -169,6 +236,100 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
                 ,
                 STR_PAD_LEFT
             );
+        }
+
+        /**
+         * Get ISRC (or Internal Identifier) For Product
+         * @param \WC_Product_Simple $item  Line Item Sold as Part of Order
+         * @return string                   ISRC (or Internal ID) for Product
+         */
+        private function getISRC(\WC_Product_Simple $item): string
+        {
+            $isrc = $item->get_attribute($this->isrcAttribute);
+
+            // Leave empty string if the product doesn't have a value for this
+            // attribute. Products without an ID are ignored.
+            if ($isrc) {
+                $isrc = str_pad(preg_replace(
+                    "/[^A-Za-z0-9]/",
+                    '',
+                    $isrc
+                ), 12, '0', STR_PAD_LEFT);
+            }
+
+            return $isrc;
+        }
+
+        /**
+         * Is the Record Valid for Including in the Report?
+         * @param \WC_Order_Item_Product  $item     Current Product Item
+         * @param float     $price                  Current Product Sale Price
+         * @param string    $type                   Current Product Album or Track
+         * @param string    $ean                    Current Product EAN Number
+         * @param string    $zip                    Current Product Custom ZIP
+         * @param string    $isrc                   Current Product ISRC / ID
+         * @return bool                             True if Valid
+         */
+        protected function isDigitalValid(
+            \WC_Order_Item_Product $item,
+            float $price,
+            string $type,
+            string $ean,
+            string $zip,
+            string $isrc
+        ): bool {
+            if ($type === '') {
+                $this->invalids[] = [
+                    'record'    =>  $item,
+                    'reason'    =>  printf(
+                        __(
+                            'The item does not have an assigned type - album or track. Set the WooCommerce attribute in the %1$ssettings%2$s.',
+                            'woocommerce-soundscan'
+                        ),
+                        '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
+                        '</a>'
+                    )
+                ];
+            } elseif ($type === 'album' && !$this->isValidEAN($ean)) {
+                $this->invalids[] = [
+                    'record'    =>  $item,
+                    'reason'    =>  printf(
+                        __(
+                            'The item does not have a valid EAN or UPC. Set the WooCommerce attribute in the %1$ssettings%2$s.',
+                            'woocommerce-soundscan'
+                        ),
+                        '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
+                        '</a>'
+                    )
+                ];
+                return false;
+            } else if ($type === 'track' && !$this->isValidISRC($isrc)) {
+                $this->invalids[] = [
+                    'record'    =>  $item,
+                    'reason'    =>  printf(
+                        __(
+                            'The item does not have a valid ISRC. Set the WooCommerce attribute in the %1$ssettings%2$s.',
+                            'woocommerce-soundscan'
+                        ),
+                        '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
+                        '</a>'
+                    )
+                ];
+                return false;
+            }
+
+            return parent::isValid($zip, $price, $type);
+        }
+
+        /**
+         * Is the Product ISRC Valid?
+         * @see http://isrc.ifpi.org/en/ for more information
+         * @param string $isrc          The Product ISRC
+         * @return bool                 True if Valid ISRC
+         */
+        private function isValidISRC(string $isrc): bool
+        {
+            return (ctype_alnum($isrc) && mb_strlen($isrc, 'utf-8') === 12);
         }
     }
 } else {

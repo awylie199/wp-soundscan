@@ -60,6 +60,18 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
         public $accountNo = '';
 
         /**
+         * Minimum Qualifying Physical Track (Single) Price
+         * @var float
+         */
+        private $minTrackPrice = 0.0;
+
+        /**
+         * Minimum Qualifying Physical Album Price
+         * @var float
+         */
+        private $minAlbumPrice = 0.0;
+
+        /**
          * @param \DateTimeImmutable $start         Start Date of the Report
          * @param \DateTimeImmutable $end           End Date of the Report
          */
@@ -78,7 +90,15 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
 
             $this->startDate = $start;
             $this->endDate = $end;
-            $this->accountNo = $this->options[Settings::ACCOUNT_NO_PHYSICAL];
+            $this->accountNo = $this->options[Settings::ACCOUNT_NO_PHYSICAL] ?? '';
+            $this->minTrackPrice = round(
+                $this->options[Settings::PHYSICAL_TRACK_MIN_PRICE] ?? 0,
+                2
+            );
+            $this->minAlbumPrice = round(
+                $this->options[Settings::PHYSICAL_ALBUM_MIN_PRICE] ?? 0,
+                2
+            );
         }
 
         /**
@@ -100,13 +120,17 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
                         $product = $order->get_product_from_item($item);
                         $id = $product->get_id();
 
-                        if ($this->isMusic($id)) {
+                        if ($this->isMusic($id) && !$this->isDigital($product)) {
                             $price = $order->get_line_total($item, false, false);
                             $ean = $this->getEAN($product);
 
-                            if ($this->isValid($item, $price, $ean, $zip)) {
+                            if ($this->isPhysicalValid($item, $price, $ean, $zip)) {
                                 for ($i = 0; $i < $item['qty']; $i++) {
-                                    $this->addRecord($ean, $zip, $order->get_status());
+                                    $this->addRecord(
+                                        $ean,
+                                        $zip,
+                                        $order->get_status()
+                                    );
                                 }
                             }
                         }
@@ -136,9 +160,9 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
          */
         public function hasNecessaryOptions(): bool
         {
-            return (
-                !empty($this->musicCategory) && !empty($this->idAttribute) &&
-                !empty($this->accountNo) && !empty($this->chainNo)
+            return !(
+                empty($this->musicCategory) || empty($this->idAttribute) ||
+                empty($this->accountNo) || empty($this->chainNo)
             );
         }
 
@@ -159,7 +183,7 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
             string $ean,
             string $status
         ) {
-            $complete = $status === 'completed';
+            $complete = ($status === 'completed');
 
             $detailRecord = self::RECORD_NO;
             $detailRecord .= $ean;
@@ -177,27 +201,18 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
 
         /**
          * Is the Record Valid for Including in the Report?
-         * @param \WC_Order_Item_Product     $item      Current Product Item
-         * @param float     $record                 Current Product Sale Price
+         * @param \WC_Order_Item_Product  $item     Current Product Item
+         * @param float     $price                  Current Product Sale Price
          * @param string    $ean                    Current Product EAN Number
+         * @param string    $zip                    Current Product Custom ZIP
          * @return bool                             True if Valid
          */
-        protected function isValid(
+        protected function isPhysicalValid(
             \WC_Order_Item_Product $item,
             float $price,
             string $ean,
             string $zip
         ): bool {
-            $valid = true;
-
-            if (!$this->isExpensiveEnough($price)) {
-                $this->invalids[] = [
-                    'record'    =>  $item,
-                    'reason'    =>  __('The item is not expensive enough (must cost at least $4.99)', 'woocommerce-soundscan')
-                ];
-                return $valid;
-            }
-
             // EAN Required if Album Sale
             if (!$this->isValidEAN($ean)) {
                 $this->invalids[] = [
@@ -211,21 +226,10 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
                         '</a>'
                     )
                 ];
-                return $valid;
+                return false;
             }
 
-            if (!$this->isValidZIP($zip)) {
-                $this->invalids[] = [
-                    'record'    =>  $item,
-                    'reason'    =>  __(
-                        'The customer must have a valid U.S. zipcode for their billing or delivery addresses.',
-                        'woocommerce-soundscan'
-                    )
-                ];
-                return $valid;
-            }
-
-            return $valid;
+            return parent::isValid($zip, $price, $type);
         }
     }
 } else {
