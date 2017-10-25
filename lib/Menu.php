@@ -29,6 +29,18 @@ if (!class_exists('AW\WSS\Menu')) {
         const ADMIN_STYLE = 'woocommerce-soundscan-css';
 
         /**
+         * Download Report WordPress Hook Action
+         * @var string
+         */
+        const DOWNLOAD_REPORT_ACTION = 'woocommerce_soundscan_export';
+
+        /**
+         * Download Report WordPress Nonce Name
+         * @var string
+         */
+        const DOWNLOAD_REPORT_NAME = 'woocommerce_soundscan';
+
+        /**
          * Data Formatter for Handling Soundscan Records
          * @var null|\AW\WSS\Formatter
          */
@@ -54,6 +66,7 @@ if (!class_exists('AW\WSS\Menu')) {
 
         public function __construct()
         {
+            add_action('admin_post_' . self::DOWNLOAD_REPORT_ACTION, [$this, 'handleDownload']);
             add_action('admin_menu', [$this, 'addSubMenu']);
             add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
 
@@ -70,6 +83,7 @@ if (!class_exists('AW\WSS\Menu')) {
                 $this->from = $this->to->modify('last Monday');
                 $this->formatter = new DigitalFormatter($this->to, $this->from);
             }
+
         }
 
         /**
@@ -147,7 +161,38 @@ if (!class_exists('AW\WSS\Menu')) {
         }
 
         /**
+         * Handle Download of Most Recent WooCommerce Soundscan
+         * @return void
+         */
+        public function handleDownload()
+        {
+            if (current_user_can('manage_options')) {
+                $name = $_GET[self::DOWNLOAD_REPORT_NAME] ?? '';
+
+                if (wp_verify_nonce($name, self::DOWNLOAD_REPORT_ACTION)) {
+                    $results = get_transient(Settings::RESULTS_TRANSIENT);
+                    $report = implode(PHP_EOL, $results);
+
+                    header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+                    header("Content-Type: application/force-download");
+                    header("Content-Type: application/octet-stream");
+                    header("Content-Type: application/download");
+                    header('Content-Disposition: attachment; filename="soundscan-report.txt"');
+                    header('Content-Length: ' . strlen($report));
+                    header("Content-Transfer-Encoding: binary");
+
+                    echo $report;
+                } else {
+                    exit;
+                }
+            } else {
+                exit;
+            }
+        }
+
+        /**
          * Get Nav Classes (Based on POST Args)
+         * @param string $tab       Tab Slug
          * @return string           Classes for Tab Element
          */
         private function getNavClass(string $tab): string
@@ -163,15 +208,15 @@ if (!class_exists('AW\WSS\Menu')) {
 
         /**
          * Get Tab (Physical vs Digital) Page Link
+         * @param string $tab        Tab Slug
          * @return string            URL for Tab Admin Link
          */
         private function getTabLink(string $tab): string
         {
-            $url = admin_url('admin.php');
-            $url = add_query_arg('page', 'soundscan', $url);
-            $url = add_query_arg('tab', $tab, $url);
-
-            return $url;
+            return add_query_arg([
+                'page'  =>  'soundscan',
+                'tab'   =>  $tab
+            ], admin_url('admin.php'));
         }
 
         /**
@@ -234,6 +279,16 @@ if (!class_exists('AW\WSS\Menu')) {
         private function outputTableHTML()
         {
             $rows = $this->formatter->getFormattedResults();
+            $url = add_query_arg(
+                'action',
+                self::DOWNLOAD_REPORT_ACTION,
+                admin_url('admin-post.php')
+            );
+            $downloadURL = wp_nonce_url(
+                $url,
+                self::DOWNLOAD_REPORT_ACTION,
+                self::DOWNLOAD_REPORT_NAME
+            );
 
             ?>
             <?php if (count($rows) || (count($this->formatter->invalids))) : ?>
@@ -269,6 +324,9 @@ if (!class_exists('AW\WSS\Menu')) {
                     </tr>
                 </tfoot>
             </table>
+            <a class="button button-primary button-large wss-export-btn" href="<?php echo esc_url($downloadURL); ?>">
+            	<?php _e('Export', 'woocommerce-soundscan'); ?>
+            </a>
             <hr />
             <h3>
                 <?php _e('Ignored Order Products', 'woocommerce-soundscan'); ?>

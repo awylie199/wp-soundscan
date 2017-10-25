@@ -5,8 +5,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-use AW\WSS\Formatter;
 use AW\WSS\IFormatter;
+use AW\WSS\Formatter;
+use AW\WSS\Data;
+use AW\WSS\Settings;
+use AW\WSS\Notifications;
 
 if (!class_exists('AW\WSS\DigitalFormatter')) {
     /**
@@ -128,6 +131,11 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
                     $this->context
                 );
             } finally {
+                set_transient(
+                    Settings::RESULTS_TRANSIENT,
+                    $this->submission,
+                    DAY_IN_SECONDS
+                );
                 return $this->submission;
             }
         }

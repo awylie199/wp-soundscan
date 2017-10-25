@@ -123,6 +123,11 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
                     $this->context
                 );
             } finally {
+                set_transient(
+                    Settings::RESULTS_TRANSIENT,
+                    $this->submission,
+                    DAY_IN_SECONDS
+                );
                 return $this->submission;
             }
         }

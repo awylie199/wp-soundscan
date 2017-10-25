@@ -48,6 +48,7 @@ if (version_compare(PHP_VERSION, '7.0.0') < 0) {
 }
 
 use AW\WSS\Setup;
+use AW\WSS\Settings;
 
 try {
     add_action('plugins_loaded', function () {
@@ -70,9 +71,10 @@ try {
             });
         }
 
-        // register_activation_hook(__FILE__, ['AW\WSS\Storage', 'create']);
         // register_activation_hook(__FILE__, ['AW\WSS\Schedule', 'set']);
-        // register_deactivation_hook(__FILE__, ['AW\WSS\Schedule', 'clear']);
+        register_deactivation_hook(__FILE__, function () {
+            delete_transient(Settings::RESULTS_TRANSIENT);
+        });
     });
 } catch (\Exception $err) {
     throw new \Exception("WooCommerce Soundscan plugin failed to initialize: {$err->getMessage()}");
