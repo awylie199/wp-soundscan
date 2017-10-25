@@ -32,6 +32,7 @@ if (!class_exists('AW\WSS\Notifications')) {
         {
             $this->logger = wc_get_logger();
             add_action('admin_notices', [$this, 'suggestIntegration']);
+            add_action('admin_notices', [$this, 'suggestActivation']);
         }
 
         /**
@@ -94,6 +95,62 @@ if (!class_exists('AW\WSS\Notifications')) {
                     </p>
                 </div>
                 <?php
+            }
+        }
+
+        /**
+         * Suggest Cron Activation for Automatic Submission of Soundscan Reports
+         * @return void
+         */
+        public function suggestActivation()
+        {
+            if (isset($_GET['page']) && $_GET['page'] === 'wc-settings' &&
+                isset($_GET['tab']) && $_GET['tab'] === 'integration') {
+                return;
+            }
+
+            $options = get_option(Settings::NAME, '');
+
+            try {
+                if (is_string($options)) {
+                    $options = unserialize($options);
+                }
+
+                $digitalCron = $options[Settings::CRON_DIGITAL_SUBMISSIONS] ?? '';
+                $physicalCron = $options[Settings::CRON_PHYSICAL_SUBMISSIONS] ?? '';
+
+                if ($digitalCron !== 'yes' && $physicalCron !== 'yes') {
+                    $url = self::getSettingsURL();
+                    ?>
+                    <div class="notice notice-warning">
+                        <p>
+                            <?php
+                            printf(
+                                __(
+                                    'Weekly submission of Soundscan reports is currently %1$sdisabled%2$s. Update your %3$ssettings%4$s to automatically upload reports each week.',
+                                    'woocommerce-soundscan'
+                                ),
+                                '<strong>',
+                                '</strong>',
+                                '<a href="' . esc_url($url) . '">',
+                                '</a>'
+                            );
+                            ?>
+                        </p>
+                    </div>
+                    <?php
+                }
+            } catch (\Exception $err) {
+                $this->logger->error(
+                    sprintf(
+                        __(
+                            'Error in Soundscan Notifications: %1$s',
+                            'woocommerce-soundscan'
+                            ),
+                        $err->getMessage()
+                    ),
+                    $this->context
+                );
             }
         }
 

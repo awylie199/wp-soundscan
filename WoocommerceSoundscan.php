@@ -71,7 +71,6 @@ try {
             });
         }
 
-        // register_activation_hook(__FILE__, ['AW\WSS\Schedule', 'set']);
         register_deactivation_hook(__FILE__, function () {
             delete_transient(Settings::RESULTS_TRANSIENT);
         });

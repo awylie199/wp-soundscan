@@ -72,6 +72,14 @@ if (!class_exists('AW\WSS\Formatter')) {
         protected $logger = null;
 
         /**
+         * WooCommerce Logger Context for Soundscan
+         * @var string[]
+         */
+        protected $context = [
+            'source'    =>  'soundscan'
+        ];
+
+        /**
          * Count of Sales in Report
          * @var int
          */
@@ -82,14 +90,6 @@ if (!class_exists('AW\WSS\Formatter')) {
          * @var int
          */
         protected $refunds = 0;
-
-        /**
-         * WooCommerce Logger Context for Soundscan
-         * @var string[]
-         */
-        protected $context = [
-            'source'    =>  'soundscan'
-        ];
 
         /**
          * WooCommerce Soundscan Integration Settings
@@ -296,7 +296,7 @@ if (!class_exists('AW\WSS\Formatter')) {
         {
             $trailerRecord = '94' . static::TRAILER_DELIMETER;
             $trailerRecord .= trim((string)($this->sales + $this->refunds)) . static::TRAILER_DELIMETER;
-            $trailerRecord .= trim((string)(abs($this->sales - $this->refunds)));
+            $trailerRecord .= trim((string)($this->sales));
 
             if (mb_strlen($trailerRecord, 'UTF-8') < 6) {
                 // Least it could be: 94 0 0
