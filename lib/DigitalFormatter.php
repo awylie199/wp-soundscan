@@ -24,7 +24,7 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
          * Record Number (at Start of Each Line Record)
          * @var string
          */
-        const RECORD_NO = 'M3';
+        const RECORD_NO = 'D3';
 
         /**
          * Delimiter for Trailer Components
@@ -33,34 +33,10 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
         const TRAILER_DELIMETER = '|';
 
         /**
-         * Assigned Account Number (XXXXX)
-         * @var string
-         */
-        public $accountNo = '';
-
-        /**
          * Product ISRC WC Attribute Name
          * @var string
          */
         public $isrcAttribute = '';
-
-        /**
-         * Data Manager for Handling Soundscan Records
-         * @var null|\AW\WSS\Data
-         */
-        private $data = null;
-
-        /**
-         * Minimum Qualifying Digital Track (Single) Price
-         * @var float
-         */
-        private $minTrackPrice = 0.0;
-
-        /**
-         * Minimum Qualifying Digital Album Price
-         * @var float
-         */
-        private $minAlbumPrice = 0.0;
 
         /**
          * @param \DateTimeImmutable $start         Start Date of the Report
@@ -88,7 +64,6 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
 
         /**
          * Get Formatted Sales Results for Soundscan Submission
-         * @param mixed[] $rows         WooCommerce Data to Format into Report1
          * @return string[]             Formatted Rows of Submission Data
          */
         public function getFormattedResults(): array
@@ -102,13 +77,14 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
                     $itemCount = 1;
                     $items = $order->get_items();
                     $zip = $this->getZip($order);
+                    $status = $order->get_status();
 
                     foreach ($items as $item) {
                         $product = $order->get_product_from_item($item);
                         $id = $product->get_id();
 
                         if ($this->isMusic($id) && $this->isDigital($product)) {
-                            $price = $order->get_line_total($item, false, false);
+                            $price = $order->get_line_total($item, false, false) / $item['qty'];
                             $ean = $this->getEAN($product);
                             $type = $this->getType($id);
                             $isrc = $this->getISRC($product);
@@ -126,7 +102,7 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
                                     $this->addRecord(
                                         $ean,
                                         $zip,
-                                        $order->get_status(),
+                                        $status,
                                         $price,
                                         $itemCount,
                                         $type,
@@ -136,8 +112,6 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
                                 }
                             }
                         }
-
-                        $itemCount++;
                     }
                 }
 
@@ -174,15 +148,15 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
         /**
          * Add a Sales Detail Record for Each Record Purchase to the Submission
          *
-         * Record Number (D3)
-         * UPC Number of Selection - Required for Albums
-         * Buyer Zip Code
-         * Trans Code (S/R) Sales/Return
-         * Item No. in this transaction - Sequential Number of Item Within Order
-         * ISRC Code - Required for Singles
-         * Formatted Price (no decimals)
-         * Type of Sale ('album' or 'track')
-         * Strata (PC = P or Mobile = M)
+         * Record Number (D3) (2)
+         * UPC Number of Selection - Required for Albums (13 / 0)
+         * Buyer Zip Code ( 5)
+         * Trans Code (S/R) Sales/Return (1)
+         * Item No. in this transaction - Sequential Number of Item Within Order (1)
+         * ISRC Code - Required for Singles (X / 0 - Not required for Singles, Can use Internal ID)
+         * Formatted Price (no decimals) (4)
+         * Type of Sale ('album' or 'track') (1)
+         * Strata (PC = P or Mobile = M) (1) This info is not available in WC - fix as 'P'
          *
          * @param string $ean=''           Product EAN / UPC Number
          * @param string $zip              Customer ZIP Code
@@ -230,7 +204,7 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
         private function formatPrice(float $price): string
         {
             return str_pad(
-                str_replace('.', '', (string)$price),
+                str_replace('.', '', number_format($price, 2)),
                 4,
                 '0'
                 ,
@@ -281,21 +255,22 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
             if ($type === '') {
                 $this->invalids[] = [
                     'record'    =>  $item,
-                    'reason'    =>  printf(
+                    'reason'    =>  sprintf(
                         __(
-                            'The item does not have an assigned type - album or track. Set the WooCommerce attribute in the %1$ssettings%2$s.',
+                            'The item does not have an assigned WooCommerce category type - album or track. Check the WooCommerce category attributes in the %1$ssettings%2$s.',
                             'woocommerce-soundscan'
                         ),
                         '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
                         '</a>'
                     )
                 ];
+                return false;
             } elseif ($type === 'album' && !$this->isValidEAN($ean)) {
                 $this->invalids[] = [
                     'record'    =>  $item,
-                    'reason'    =>  printf(
+                    'reason'    =>  sprintf(
                         __(
-                            'The item does not have a valid EAN or UPC. Set the WooCommerce attribute in the %1$ssettings%2$s.',
+                            'The item does not have a valid EAN or UPC number. An EAN number is 12 digits long, and a UPC number is 13 digits. Check the value for the WooCommerce attribute set in the %1$ssettings%2$s.',
                             'woocommerce-soundscan'
                         ),
                         '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
@@ -306,9 +281,9 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
             } else if ($type === 'track' && !$this->isValidISRC($isrc)) {
                 $this->invalids[] = [
                     'record'    =>  $item,
-                    'reason'    =>  printf(
+                    'reason'    =>  sprintf(
                         __(
-                            'The item does not have a valid ISRC. Set the WooCommerce attribute in the %1$ssettings%2$s.',
+                            'The item has an empty ISRC / internal ID WooCommerce attribute value. Checkthe WooCommerce ISRC attribute in the %1$ssettings%2$s.',
                             'woocommerce-soundscan'
                         ),
                         '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
@@ -318,7 +293,7 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
                 return false;
             }
 
-            return parent::isValid($zip, $price, $type);
+            return parent::isValid($item, $zip, $price, $type);
         }
 
         /**

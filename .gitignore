@@ -1,2 +1,6 @@
 /vendor/
 /node_modules/
+.buildpath
+.project/
+.settings/
+.project

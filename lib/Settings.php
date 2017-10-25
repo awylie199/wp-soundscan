@@ -285,11 +285,11 @@ if (!class_exists('AW\WSS\Settings')) {
                     ),
                     'type'              => 'text',
                     'description'       => __(
-                        'The Nielsen (S)FTP address, beginning with ftp:// or sftps://.',
+                        'The Nielsen (S)FTP address, beginning with ftp:// or ftps://.',
                         'woocommerce-soundscan'
                     ),
                     'desc_tip'          => true,
-                    'placeholder'       =>  'sftp://'
+                    'placeholder'       =>  'ftps://'
                 ],
                 'chainNo'           =>  [
                     'title'             => __(
@@ -458,12 +458,17 @@ if (!class_exists('AW\WSS\Settings')) {
                         'To qualify for Soundscan Reporting the sale must be for a mimimum amount. Up to date figures can be obtained from Nielsen.',
                         'woocommerce-soundscan'
                     ),
-                    'desc_tip'          => true,
-                    'default'           => 0.39
+                    'desc_tip'          =>  true,
+                    'default'           =>  '0.39',
+                    'custom_attributes' =>  [
+                        'step'          =>  '0.01',
+                        'min'           =>  0,
+                        'max'           =>  '99.99'
+                    ]
                 ],
                 'physicalTrackMinPrice' =>  [
                     'title'             => __(
-                        'Digital Track (Single) Minimum Price',
+                        'Physical Track (Single) Minimum Price',
                         'woocommerce-soundscan'
                     ),
                     'type'              => 'number',
@@ -471,8 +476,13 @@ if (!class_exists('AW\WSS\Settings')) {
                         'To qualify for Soundscan Reporting the sale must be for a mimimum amount. Up to date figures can be obtained from Nielsen.',
                         'woocommerce-soundscan'
                     ),
-                    'desc_tip'          => true,
-                    'default'           => 4.99
+                    'desc_tip'          =>  true,
+                    'default'           =>  '4.99',
+                    'custom_attributes' =>  [
+                        'step'          =>  '0.01',
+                        'min'           =>  0,
+                        'max'           =>  '99.99'
+                    ]
                 ],
                 'digitalAlbumMinPrice'  =>  [
                     'title'             => __(
@@ -484,10 +494,15 @@ if (!class_exists('AW\WSS\Settings')) {
                         'To qualify for Soundscan Reporting the sale must be for a mimimum amount. Up to date figures can be obtained from Nielsen.',
                         'woocommerce-soundscan'
                     ),
-                    'desc_tip'          => true,
-                    'default'           => 3.49
+                    'desc_tip'          =>  true,
+                    'default'           =>  '3.49',
+                    'custom_attributes' =>  [
+                        'step'          =>  '0.01',
+                        'min'           =>  0,
+                        'max'           =>  '99.99'
+                    ]
                 ],
-                'phyiscalAlbumMinPrice' =>  [
+                'physicalAlbumMinPrice' =>  [
                     'title'             => __(
                         'Physical Album Minimum Price',
                         'woocommerce-soundscan'
@@ -497,8 +512,13 @@ if (!class_exists('AW\WSS\Settings')) {
                         'To qualify for Soundscan Reporting the sale must be for a mimimum amount. Up to date figures can be obtained from Nielsen.',
                         'woocommerce-soundscan'
                     ),
-                    'desc_tip'          => true,
-                    'default'           => 4.99
+                    'desc_tip'          =>  true,
+                    'default'           =>  '4.99',
+                    'custom_attributes' =>  [
+                        'step'          =>  '0.01',
+                        'min'           =>  0,
+                        'max'           =>  '99.99'
+                    ]
                 ]
             ];
         }
@@ -562,7 +582,7 @@ if (!class_exists('AW\WSS\Settings')) {
         ): string {
             $field = $this->plugin_id . $this->id . '_' . $key;
             $defaults = [
-                'class'             => '',
+                'class'             => 'wss-settings-select',
                 'css'               => '',
                 'custom_attributes' => [],
                 'desc_tip'          => false,

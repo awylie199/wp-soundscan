@@ -36,42 +36,6 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
         const TRAILER_DELIMETER = ' ';
 
         /**
-         * Data Manager for Handling Soundscan Records
-         * @var null|\AW\WSS\Data
-         */
-        protected $data = null;
-
-        /**
-         * Start Date of the Report
-         * @var null|\DateTimeImmutable
-         */
-        protected $startDate = null;
-
-        /**
-         * End Date of the Report
-         * @var null|\DateTimeImmutable
-         */
-        protected $endDate = null;
-
-        /**
-         * Assigned Account Number (XXXXX)
-         * @var string
-         */
-        public $accountNo = '';
-
-        /**
-         * Minimum Qualifying Physical Track (Single) Price
-         * @var float
-         */
-        private $minTrackPrice = 0.0;
-
-        /**
-         * Minimum Qualifying Physical Album Price
-         * @var float
-         */
-        private $minAlbumPrice = 0.0;
-
-        /**
          * @param \DateTimeImmutable $start         Start Date of the Report
          * @param \DateTimeImmutable $end           End Date of the Report
          */
@@ -115,6 +79,7 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
                 foreach ($rows as $order) {
                     $items = $order->get_items();
                     $zip = $this->getZip($order);
+                    $status = $order->get_status();
 
                     foreach ($items as $item) {
                         $product = $order->get_product_from_item($item);
@@ -123,13 +88,21 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
                         if ($this->isMusic($id) && !$this->isDigital($product)) {
                             $price = $order->get_line_total($item, false, false);
                             $ean = $this->getEAN($product);
+                            $type = $this->getType($id);
+                            $valid = $this->isPhysicalValid(
+                                $item,
+                                $price,
+                                $type,
+                                $ean,
+                                $zip
+                            );
 
-                            if ($this->isPhysicalValid($item, $price, $ean, $zip)) {
+                            if ($valid) {
                                 for ($i = 0; $i < $item['qty']; $i++) {
                                     $this->addRecord(
-                                        $ean,
                                         $zip,
-                                        $order->get_status()
+                                        $ean,
+                                        $status
                                     );
                                 }
                             }
@@ -169,10 +142,10 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
         /**
          * Add a Sales Detail Record for Each Record Purchase to the Submission
          *
-         * Record Number (M3)
-         * EAN Number of Selection if bought as an Album
-         * Buyer Zip Code
-         * Trans Code (S/R) Sales/Return
+         * Record Number (M3) (2)
+         * EAN / UPC Number (13)
+         * Buyer Zip Code (5)
+         * Trans Code (S/R) Sales/Return (1)
          *
          * @param string $ean        Record EAN
          * @param string $zip        Order Zip Code
@@ -203,6 +176,7 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
          * Is the Record Valid for Including in the Report?
          * @param \WC_Order_Item_Product  $item     Current Product Item
          * @param float     $price                  Current Product Sale Price
+         * @param string    $type                   Current Product Type - Album / Track
          * @param string    $ean                    Current Product EAN Number
          * @param string    $zip                    Current Product Custom ZIP
          * @return bool                             True if Valid
@@ -210,6 +184,7 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
         protected function isPhysicalValid(
             \WC_Order_Item_Product $item,
             float $price,
+            string $type,
             string $ean,
             string $zip
         ): bool {
@@ -217,9 +192,9 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
             if (!$this->isValidEAN($ean)) {
                 $this->invalids[] = [
                     'record'    =>  $item,
-                    'reason'    =>  printf(
+                    'reason'    =>  sprintf(
                         __(
-                            'The item does not have a valid EAN or UPC number. Set the WooCommerce attribute in the %1$ssettings%2$s.',
+                            'The item does not have a valid EAN or UPC number. An EAN number is 12 digits long, and a UPC number is 13 digits. Check the value for the WooCommerce attribute set in the %1$ssettings%2$s.',
                             'woocommerce-soundscan'
                         ),
                         '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
@@ -229,7 +204,7 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
                 return false;
             }
 
-            return parent::isValid($zip, $price, $type);
+            return parent::isValid($item, $zip, $price, $type);
         }
     }
 } else {

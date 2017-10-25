@@ -36,9 +36,15 @@ if (! defined('ABSPATH')) {
 }
 
 if (version_compare(PHP_VERSION, '7.0.0') < 0) {
-    throw new \Exception(
-        'WooCommerce Soundscan plugin requires at least PHP version 7.0.'
-    );
+    add_action('admin_notices', function () {
+        ?>
+        <div class="notice notice-error">
+        	<p>
+            	<?php __('WooCommerce requires PHP 7.0 to work.', 'woocommerce-soundscan'); ?>
+        	</p>
+        </div>
+        <?php
+    });
 }
 
 use AW\WSS\Setup;
@@ -52,6 +58,16 @@ try {
             require_once WC_SOUNDSCAN_DIR . DIRECTORY_SEPARATOR . 'vendor/autoload.php';
 
             Setup::getInstance();
+        } else {
+            add_action('admin_notices', function () {
+                ?>
+                <div class="notice notice-warning">
+                    <p>
+                    	<?php _e('WooCommerce Soundscan needs WooCommerce installed to work.', 'woocommerce-soundscan'); ?>
+	                </p>
+                </div>
+                <?php
+            });
         }
 
         // register_activation_hook(__FILE__, ['AW\WSS\Storage', 'create']);

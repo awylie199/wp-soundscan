@@ -30,28 +30,40 @@ if (!class_exists('AW\WSS\Formatter')) {
         public $invalids = [];
 
         /**
-         * UPC / EAN WC Attribute Name
+         * Assigned Account Number (XXXXX)
          * @var string
          */
-        protected $idAttribute = '';
+        public $accountNo = '';
+
+        /**
+         * Start Date of the Report
+         * @var null|\DateTimeImmutable
+         */
+        protected $startDate = null;
+
+        /**
+         * End Date of the Report
+         * @var null|\DateTimeImmutable
+         */
+        protected $endDate = null;
+
+        /**
+         * UPC WC Attribute Name
+         * @var string
+         */
+        protected $upcAttribute = '';
+
+        /**
+         * EAN WC Attribute Name
+         * @var string
+         */
+        protected $eanAttribute = '';
 
         /**
          * WC Category for Music
          * @var string
          */
         protected $musicCategory = '';
-
-        /**
-         * WooCommerce SubCategory Name for Albums
-         * @var string
-         */
-        private $albumCategory = '';
-
-        /**
-         * WooCommerce SubCategory Name for Singles (Tracks)
-         * @var string
-         */
-        private $trackCategory = '';
 
         /**
          * WooCommerce Logger
@@ -85,6 +97,36 @@ if (!class_exists('AW\WSS\Formatter')) {
          */
         protected $options = [];
 
+        /**
+         * Minimum Qualifying Physical Track (Single) Price
+         * @var float
+         */
+        protected $minTrackPrice = 0.0;
+
+        /**
+         * Minimum Qualifying Physical Album Price
+         * @var float
+         */
+        protected $minAlbumPrice = 0.0;
+
+        /**
+         * Data Manager for Handling Soundscan Records
+         * @var null|\AW\WSS\Data
+         */
+        protected $data = null;
+
+        /**
+         * WooCommerce SubCategory Name for Albums
+         * @var string
+         */
+        private $albumCategory = '';
+
+        /**
+         * WooCommerce SubCategory Name for Singles (Tracks)
+         * @var string
+         */
+        private $trackCategory = '';
+
         protected function __construct()
         {
             $this->logger = wc_get_logger();
@@ -97,15 +139,11 @@ if (!class_exists('AW\WSS\Formatter')) {
                 }
 
                 $this->chainNo = $this->options[Settings::CHAIN_NO];
-                $this->idAttribute = $this->options[Settings::EAN_ATTRIBUTE] ?? '';
+                $this->eanAttribute = $this->options[Settings::EAN_ATTRIBUTE] ?? '';
+                $this->upcAttribute = $this->options[Settings::UPC_ATTRIBUTE] ?? '';
                 $this->musicCategory = $this->options[Settings::MUSIC_CATEGORY] ?? '';
                 $this->albumCategory = $this->options[Settings::ALBUM_CATEGORY] ?? '';
                 $this->trackCategory = $this->options[Settings::TRACK_CATEGORY] ?? '';
-
-                if (!$this->idAttribute) {
-                    // Fallback to UPC if the EAN is not available.
-                    $this->idAttribute = $this->options[Settings::UPC_ATTRIBUTE] ?? '';
-                }
             } catch (\Exception $err) {
                 $this->logger->error(
                     sprintf(
@@ -118,6 +156,15 @@ if (!class_exists('AW\WSS\Formatter')) {
                     $this->context
                 );
             }
+        }
+
+        /**
+         * Get Invalid Results
+         * @return mixed[]          Invalid Records with Reasons
+         */
+        public function getInvalidResults(): array
+        {
+            return $this->invalids;
         }
 
         /**
@@ -148,15 +195,19 @@ if (!class_exists('AW\WSS\Formatter')) {
          */
         protected function getEAN(\WC_Product_Simple $item): string
         {
-            $ean = $item->get_attribute($this->idAttribute);
+            $ean = preg_replace("/[^0-9]/", '', $item->get_attribute($this->eanAttribute));
 
-            // Leave empty string if the product doesn't have a value for this
-            // attribute. Products without an EAN / UPC are ignored.
-            if ($ean) {
-                $ean = str_pad($ean, 13, '0', STR_PAD_LEFT);
+            if (mb_strlen($ean, 'utf-8') === 13) {
+                return $ean;
+            } else {
+                $upc = preg_replace("/[^0-9]/", '', $item->get_attribute($this->upcAttribute));
+
+                if (mb_strlen($upc, 'utf-8') === 12) {
+                    return str_pad($upc, 13, '0', STR_PAD_LEFT);
+                } else {
+                    return '';
+                }
             }
-
-            return $ean;
         }
 
         /**
@@ -207,7 +258,7 @@ if (!class_exists('AW\WSS\Formatter')) {
                 $country = $order->get_billing_country();
 
                 if ($country === 'US') {
-                    $zip = substr($zip, trim(preg_replace(
+                    $zip = substr(trim(preg_replace(
                         "/[^A-Za-z0-9]/",
                         '',
                         $order->get_billing_postcode()
@@ -278,15 +329,6 @@ if (!class_exists('AW\WSS\Formatter')) {
         }
 
         /**
-         * Get Invalid Results
-         * @return mixed[]          Invalid Records with Reasons
-         */
-        public function getInvalidResults(): array
-        {
-            return $this->invalids;
-        }
-
-        /**
          * True if Product Item is Digital
          * @param \WC_Product $product  WC Order Product
          * @return bool                 True if the Item is Digital
@@ -325,13 +367,14 @@ if (!class_exists('AW\WSS\Formatter')) {
             if (!$this->isExpensiveEnough($price, $type)) {
                 $this->invalids[] = [
                     'record'    =>  $item,
-                    'reason'    =>  printf(
+                    'reason'    =>  sprintf(
                         __(
-                            'The item does not qualify as expensive enough. Adjust the minimum price %$1ssettings%$2s if required.',
+                            'The item (sold for $%3$s) does not qualify as expensive enough. Adjust the minimum price %1$ssettings%2$s if required.',
                             'woocommerce-soundscan'
                         ),
                         '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
-                        '</a>'
+                        '</a>',
+                        number_format($price, 2)
                     )
                 ];
 

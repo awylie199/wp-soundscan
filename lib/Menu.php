@@ -294,8 +294,8 @@ if (!class_exists('AW\WSS\Menu')) {
                     </tr>
                 </thead>
                 <tbody>
+                    <?php foreach ($this->formatter->invalids as $row) : ?>
                     <tr>
-                        <?php foreach ($this->formatter->invalids as $row) : ?>
                         <td>
                             <?php
                                 printf(
@@ -305,10 +305,10 @@ if (!class_exists('AW\WSS\Menu')) {
                             ?>
                         </td>
                         <td>
-                        <?php echo esc_html($row['reason']); ?>
+                        <?php echo $row['reason']; ?>
                         </td>
-                        <?php endforeach; ?>
                     </tr>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
             <?php endif; ?>

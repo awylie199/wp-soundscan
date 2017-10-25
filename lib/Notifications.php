@@ -46,8 +46,6 @@ if (!class_exists('AW\WSS\Notifications')) {
             }
 
             $options = get_option(Settings::NAME, '');
-            $ftpHost = '';
-            $chainNo = '';
 
             try {
                 if (is_string($options)) {
@@ -56,7 +54,9 @@ if (!class_exists('AW\WSS\Notifications')) {
 
                 $ftpHost = $options[Settings::FTP_HOST] ?? '';
                 $chainNo = $options[Settings::CHAIN_NO] ?? '';
-                $category = $options[Settings::MUSIC_CATEGORY] ?? '';
+                $musicCategory = $options[Settings::MUSIC_CATEGORY] ?? '';
+                $albumCategory = $options[Settings::ALBUM_CATEGORY] ?? '';
+                $trackCategory = $options[Settings::TRACK_CATEGORY] ?? '';
                 $ean = $options[Settings::EAN_ATTRIBUTE] ?? '';
                 $upc = $options[Settings::UPC_ATTRIBUTE] ?? '';
             } catch (\Exception $err) {
@@ -72,7 +72,8 @@ if (!class_exists('AW\WSS\Notifications')) {
                 );
             }
 
-            if (!$ftpHost || !$chainNo || $category || (!$ean || !$upc)) {
+            if (!$ftpHost || !$chainNo || !$musicCategory || !$albumCategory ||
+                !$trackCategory || (!$ean && !$upc)) {
                 $url = self::getSettingsURL();
 
                 ?>
@@ -102,11 +103,11 @@ if (!class_exists('AW\WSS\Notifications')) {
          */
         public static function getSettingsURL(): string
         {
-            $url = admin_url('admin.php');
-            $url = add_query_arg('page', 'wc-settings', $url);
-            $url = add_query_arg('tab', 'integration', $url);
+            return add_query_arg([
+                'page'  =>  'wc-settings',
+                'tab'   =>  'integration',
+            ], admin_url('admin.php'));
 
-            return $url;
         }
     }
 } else {
