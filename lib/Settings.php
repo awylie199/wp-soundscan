@@ -5,6 +5,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+use AW\WSS\DigitalSchedule;
+use AW\WSS\PhysicalSchedule;
+
 if (!class_exists('AW\WSS\Settings')) {
     /*
      * Plugin Settings for WooCommerce Soundscan
@@ -13,7 +16,6 @@ if (!class_exists('AW\WSS\Settings')) {
      */
     class Settings extends \WC_Integration
     {
-
         /**
          * Latest Generated Soundscan Reports Transient Name
          * @var string
@@ -302,6 +304,38 @@ if (!class_exists('AW\WSS\Settings')) {
                 'woocommerce_settings_api_sanitized_fields_' . $this->id,
                 [$this, 'sanitizeOptions']
             );
+            add_action('update_option_' . self::NAME, [$this, 'handleSave']);
+        }
+
+        /**
+         * Handle WooCommerce Soundscan Options Save, Triggering Submission Schedules
+         * @param mixed[] $oldValue             Old Option Values
+         * @return void
+         */
+        public function handleSave(array $oldValue)
+        {
+            $newOptions = get_option(self::NAME);
+            $digitalSchedule = new DigitalSchedule();
+            $physicalSchedule = new PhysicalSchedule();
+
+            if (is_array($newOptions)) {
+                $digitalOption = $newOptions['cronDigitalSubmissions'] ?? '';
+                $physicalOption = $newOptions['cronPhysicalSubmissions'] ?? '';
+
+                if ($digitalOption === 'yes') {
+                    $digitalSchedule->activate();
+                } else {
+                }   $digitalSchedule->deactivate();
+
+                if ($physicalOption === 'yes') {
+                    $physicalSchedule->activate();
+                } else {
+                    $physicalSchedule->deactivate();
+                }
+            } else {
+                $digitalSchedule->deactivate();
+                $physicalSchedule->deactivate();
+            }
         }
 
         /**

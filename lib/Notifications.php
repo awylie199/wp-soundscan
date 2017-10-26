@@ -7,6 +7,9 @@ if (!defined('ABSPATH')) {
 }
 
 use AW\WSS\Settings;
+use AW\WSS\PhysicalFormatter;
+use AW\WSS\DigitalFormatter;
+use AW\WSS\Submission;
 
 if (!class_exists('AW\WSS\Notifications')) {
     /**
@@ -31,6 +34,12 @@ if (!class_exists('AW\WSS\Notifications')) {
         public function __construct()
         {
             $this->logger = wc_get_logger();
+            $this->options = get_option(Settings::NAME, '');
+
+            if (is_string($this->options)) {
+                $this->options = unserialize($this->options);
+            }
+
             add_action('admin_notices', [$this, 'suggestIntegration']);
             add_action('admin_notices', [$this, 'suggestActivation']);
         }
@@ -46,32 +55,13 @@ if (!class_exists('AW\WSS\Notifications')) {
                 return;
             }
 
-            $options = get_option(Settings::NAME, '');
-
-            try {
-                if (is_string($options)) {
-                    $options = unserialize($options);
-                }
-
-                $ftpHost = $options[Settings::FTP_HOST] ?? '';
-                $chainNo = $options[Settings::CHAIN_NO] ?? '';
-                $musicCategory = $options[Settings::MUSIC_CATEGORY] ?? '';
-                $albumCategory = $options[Settings::ALBUM_CATEGORY] ?? '';
-                $trackCategory = $options[Settings::TRACK_CATEGORY] ?? '';
-                $ean = $options[Settings::EAN_ATTRIBUTE] ?? '';
-                $upc = $options[Settings::UPC_ATTRIBUTE] ?? '';
-            } catch (\Exception $err) {
-                $this->logger->error(
-                    sprintf(
-                        __(
-                            'Error in Soundscan Notifications: %1$s',
-                            'woocommerce-soundscan'
-                        ),
-                        $err->getMessage()
-                    ),
-                    $this->context
-                );
-            }
+            $ftpHost = $this->options[Settings::FTP_HOST] ?? '';
+            $chainNo = $this->options[Settings::CHAIN_NO] ?? '';
+            $musicCategory = $this->options[Settings::MUSIC_CATEGORY] ?? '';
+            $albumCategory = $this->options[Settings::ALBUM_CATEGORY] ?? '';
+            $trackCategory = $this->options[Settings::TRACK_CATEGORY] ?? '';
+            $ean = $this->options[Settings::EAN_ATTRIBUTE] ?? '';
+            $upc = $this->options[Settings::UPC_ATTRIBUTE] ?? '';
 
             if (!$ftpHost || !$chainNo || !$musicCategory || !$albumCategory ||
                 !$trackCategory || (!$ean && !$upc)) {
@@ -109,15 +99,9 @@ if (!class_exists('AW\WSS\Notifications')) {
                 return;
             }
 
-            $options = get_option(Settings::NAME, '');
-
             try {
-                if (is_string($options)) {
-                    $options = unserialize($options);
-                }
-
-                $digitalCron = $options[Settings::CRON_DIGITAL_SUBMISSIONS] ?? '';
-                $physicalCron = $options[Settings::CRON_PHYSICAL_SUBMISSIONS] ?? '';
+                $digitalCron = $this->options[Settings::CRON_DIGITAL_SUBMISSIONS] ?? '';
+                $physicalCron = $this->options[Settings::CRON_PHYSICAL_SUBMISSIONS] ?? '';
 
                 if ($digitalCron !== 'yes' && $physicalCron !== 'yes') {
                     $url = self::getSettingsURL();
@@ -139,6 +123,67 @@ if (!class_exists('AW\WSS\Notifications')) {
                         </p>
                     </div>
                     <?php
+                } else {
+                    $date = new \DateTimeImmutable();
+
+                    if ($digitalCron === 'yes') {
+                        $digitalFormatter = new DigitalFormatter(
+                            $date,
+                            $date
+                        );
+                        $submitter = new Submission($digitalFormatter);
+
+                        if (!$digitalFormatter->hasNecessaryOptions() ||
+                            !$submitter->hasNecessaryOptions()) {
+                            ?>
+                            <div class="notice notice-error">
+                                <p>
+                                    <?php
+                                    printf(
+                                        __(
+                                            'Weekly submission of digital Soundscan reports is currently %1$senabled%2$s. However, your settings are incomplete. Update your %3$ssettings%4$s to submit your reports automatically.',
+                                            'woocommerce-soundscan'
+                                        ),
+                                        '<strong>',
+                                        '</strong>',
+                                        '<a href="' . esc_url($url) . '">',
+                                        '</a>'
+                                    );
+                                    ?>
+                                </p>
+                            </div>
+                            <?php
+                        }
+                    }
+                    if ($physicalCron === 'yes') {
+                        $physicalFormatter = new PhysicalFormatter(
+                            $date,
+                            $date
+                        );
+                        $submitter = new Submission($physicalFormatter);
+
+                        if (!$physicalFormatter->hasNecessaryOptions() ||
+                            !$submitter->hasNecessaryOptions()) {
+                            ?>
+                            <div class="notice notice-error">
+                                <p>
+                                    <?php
+                                    printf(
+                                        __(
+                                            'Weekly submission of physical Soundscan reports is currently %1$senabled%2$s. However, your settings are incomplete. Update your %3$ssettings%4$s to submit your reports automatically.',
+                                            'woocommerce-soundscan'
+                                        ),
+                                        '<strong>',
+                                        '</strong>',
+                                        '<a href="' . esc_url($url) . '">',
+                                        '</a>'
+                                    );
+                                    ?>
+                                </p>
+                            </div>
+                            <?php
+                        }
+                    }
                 }
             } catch (\Exception $err) {
                 $this->logger->error(

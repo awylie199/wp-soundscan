@@ -5,17 +5,43 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-interface ISchedule
-{
+if (!interface_exists('\AW\WSS\ISchedule')) {
     /**
-     * Activate WP Schedule Hook
-     * @return void
+     * Defines Behaviour for Soundscan Schedulers
      */
-    public function activate();
+    interface ISchedule
+    {
+        /**
+         * Activate WP Schedule Hook
+         * @return void
+         */
+        public function activate();
 
-    /**
-     * Deactivate WP Scheduled Hook
-     * @return void
-     */
-    public function deactivate();
+        /**
+         * Deactivate WP Scheduled Hook
+         * @return void
+         */
+        public function deactivate();
+
+        /**
+         * Get Singleton Instance of the Schedule
+         * @return \AW\WSS\ISchedule            Singleton Instance of the Scheduler
+         */
+        public static function instance(): ISchedule;
+
+        /**
+         * Get Start Date of the Scheduled Report
+         * @return \DateTimeImmutable
+         */
+        public function getStartDate(): \DateTimeImmutable;
+
+        /**
+         * Get End Date of the Scheduled Report
+         * @return \DateTimeImmutable
+         */
+        public function getEndDate(): \DateTimeImmutable;
+    }
+} else {
+    throw new \Exception('Woocommerce Soundscan ISchedule interface exists');
 }
+

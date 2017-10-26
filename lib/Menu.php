@@ -8,6 +8,8 @@ if (!defined('ABSPATH')) {
 use AW\WSS\Notifications;
 use AW\WSS\PhysicalFormatter;
 use AW\WSS\DigitalFormatter;
+use AW\WSS\PhysicalSchedule;
+use AW\WSS\DigitalSchedule;
 use AW\WSS\Data;
 
 if (!class_exists('AW\WSS\Menu')) {
@@ -35,10 +37,16 @@ if (!class_exists('AW\WSS\Menu')) {
         const DOWNLOAD_REPORT_ACTION = 'woocommerce_soundscan_export';
 
         /**
-         * Download Report WordPress Nonce Name
+         * WooCommerce Soundscan Menu Admin Post NONCE Name
          * @var string
          */
-        const DOWNLOAD_REPORT_NAME = 'woocommerce_soundscan';
+        const MENU_NONCE_NAME = 'woocommerce_soundscan';
+
+        /**
+         * Download Report WordPress Hook Action
+         * @var string
+         */
+        const DATES_CHANGE_ACTION = 'woocommerce_soundscan_dates_change';
 
         /**
          * Data Formatter for Handling Soundscan Records
@@ -64,26 +72,31 @@ if (!class_exists('AW\WSS\Menu')) {
          */
         private $type = 'physical';
 
+        /**
+         * WooCommerce Logger
+         * @var null|\WC_Logger
+         */
+        private $logger = null;
+
+        /**
+         * WooCommerce Logger Context for Soundscan
+         * @var string[]
+         */
+        private $context = [
+            'source'    =>  'soundscan'
+        ];
+
         public function __construct()
         {
+            $this->logger = wc_get_logger();
             add_action('admin_post_' . self::DOWNLOAD_REPORT_ACTION, [$this, 'handleDownload']);
+            add_action('wp_ajax_' . self::DATES_CHANGE_ACTION, [$this, 'handleDatesChange']);
             add_action('admin_menu', [$this, 'addSubMenu']);
             add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
 
             if (isset($_GET['tab'])) {
                 $this->type = $_GET['tab'];
             }
-
-            $this->to = new \DateTimeImmutable();
-
-            if ($this->type === 'physical') {
-                $this->from = $this->to->modify('last Thursday');
-                $this->formatter = new PhysicalFormatter($this->to, $this->from);
-            } else {
-                $this->from = $this->to->modify('last Monday');
-                $this->formatter = new DigitalFormatter($this->to, $this->from);
-            }
-
         }
 
         /**
@@ -167,7 +180,7 @@ if (!class_exists('AW\WSS\Menu')) {
         public function handleDownload()
         {
             if (current_user_can('manage_options')) {
-                $name = $_GET[self::DOWNLOAD_REPORT_NAME] ?? '';
+                $name = $_GET[self::MENU_NONCE_NAME] ?? '';
 
                 if (wp_verify_nonce($name, self::DOWNLOAD_REPORT_ACTION)) {
                     $results = get_transient(Settings::RESULTS_TRANSIENT);
@@ -181,12 +194,55 @@ if (!class_exists('AW\WSS\Menu')) {
                     header('Content-Length: ' . strlen($report));
                     header("Content-Transfer-Encoding: binary");
 
-                    echo $report;
+                    exit($report);
                 } else {
                     exit;
                 }
             } else {
                 exit;
+            }
+        }
+
+        /**
+         * Handle Dates Change Requests for Report
+         * @return void
+         */
+        public function handleDatesChange()
+        {
+            if (current_user_can('manage_options')) {
+                $name = $_GET[self::MENU_NONCE_NAME] ?? '';
+
+                if (wp_verify_nonce($name, self::DATES_CHANGE_ACTION)) {
+                    $from = \DateTimeImmutable::createFromFormat(
+                        'Ymd',
+                        $_GET['from'] ?? ''
+                    );
+                    $to = \DateTimeImmutable::createFromFormat(
+                        'Ymd',
+                        $_GET['to'] ?? ''
+                    );
+
+                    if ($from !== false && $to !== false) {
+                        ob_start();
+                        $this->outputTableHTML($from, $to);
+                        $html = ob_get_clean();
+                        ob_end_clean();
+                        wp_send_json_success($html);
+                    } else {
+                        $this->logger->error(
+                            __(
+                                'Error in Soundscan Menu: Unable to parse reports dates change request.',
+                                'woocommerce-soundscan'
+                            ),
+                            $this->context
+                        );
+                        wp_send_json_error();
+                    }
+                } else {
+                    wp_send_json_error();
+                }
+            } else {
+                wp_send_json_error();
             }
         }
 
@@ -225,9 +281,13 @@ if (!class_exists('AW\WSS\Menu')) {
          */
         private function outputDatePickersHTML()
         {
+            $url = wp_nonce_url(
+                admin_url('admin-ajax.php'),
+                self::DATES_CHANGE_ACTION, self::MENU_NONCE_NAME
+            );
             $dateFormat = get_option('date_format');
             ?>
-            <div class="wss-dates">
+            <div id="wss-dates" class="wss-dates" data-url="<?php echo esc_url($url); ?>">
                 <label for="wss-to">
                     <?php _e('From', 'woocommerce-soundscan'); ?>
                 </label>
@@ -237,6 +297,10 @@ if (!class_exists('AW\WSS\Menu')) {
                 </label>
                 <input id="wss-to" type="text" class="datepicker" name="to" value="<?php echo $this->to->format($dateFormat); ?>" />
             </div>
+            <div id="wss-dates-spinner" class="spinner"></div>
+            <p id="wss-dates-error" class="wss-dates-error">
+                 <?php _e('An error has ocurred trying to change the dates. Please check your woocommerce logs.', 'woocommerce-soundscan'); ?>
+            </p>
             <hr />
             <?php
         }
@@ -276,8 +340,11 @@ if (!class_exists('AW\WSS\Menu')) {
          * Output HTML for the Formatted Soundscan Results (or Lack Of)
          * @return void
          */
-        private function outputTableHTML()
-        {
+        private function outputTableHTML(
+            \DateTimeImmutable $from = null,
+            \DateTimeImmutable $to = null
+        ) {
+            $this->setFormatterAndDates($from, $to);
             $rows = $this->formatter->getFormattedResults();
             $url = add_query_arg(
                 'action',
@@ -291,85 +358,86 @@ if (!class_exists('AW\WSS\Menu')) {
             );
 
             ?>
+            <div id="wss-menu">
             <?php if (count($rows) || (count($this->formatter->invalids))) : ?>
-            <table class="report-results">
-                <thead>
-                    <tr>
-                        <th>
-                            <?php _e('Soundscan Generated Record', 'woocommerce-soundscan') ?>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($rows as $row) : ?>
-                    <tr>
-                        <td>
-                            <?php echo esc_html($row); ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td>
-                            <strong>
-                                <?php _e('Total Rows:', 'woocommerce-soundscan'); ?>
-                            </strong>
-                        </td>
-                        <td>
-                            <strong>
-                                <?php esc_html_e(count($rows)); ?>
-                            </strong>
-                        </td>
-                    </tr>
-                </tfoot>
-            </table>
-            <a class="button button-primary button-large wss-export-btn" href="<?php echo esc_url($downloadURL); ?>">
-            	<?php _e('Export', 'woocommerce-soundscan'); ?>
-            </a>
-            <hr />
-            <h3>
-                <?php _e('Ignored Order Products', 'woocommerce-soundscan'); ?>
-            </h3>
-            <p>
-                <?php
-                _e(
-                    'Order items that do not meet the soundscan criteria are listed here with the reason why.',
-                    'woocommerce-soundscan'
-                );
-                ?>
-            </p>
-            <?php if (count($this->formatter->invalids)) : ?>
-            <table class="invalid-results">
-                <thead>
-                    <tr>
-                        <th>
-                        <?php _e('Product Name', 'woocommerce-soundscan') ?>
-                        </th>
-                        <th>
-                        <?php _e('Reason', 'woocommerce-soundscan') ?>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($this->formatter->invalids as $row) : ?>
-                    <tr>
-                        <td>
-                            <?php
-                                printf(
-                                    esc_html__('%s', 'woocommerce-soundscan'),
-                                    $row['record']->get_name()
-                                );
-                            ?>
-                        </td>
-                        <td>
-                        <?php echo $row['reason']; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-            <?php endif; ?>
+                <table class="report-results">
+                    <thead>
+                        <tr>
+                            <th>
+                                <?php _e('Soundscan Generated Record', 'woocommerce-soundscan') ?>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($rows as $row) : ?>
+                        <tr>
+                            <td>
+                                <?php echo esc_html($row); ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>
+                                <strong>
+                                    <?php _e('Total Rows:', 'woocommerce-soundscan'); ?>
+                                </strong>
+                            </td>
+                            <td>
+                                <strong>
+                                    <?php esc_html_e(count($rows)); ?>
+                                </strong>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <a class="button button-primary button-large wss-export-btn" href="<?php echo esc_url($downloadURL); ?>">
+                	<?php _e('Export', 'woocommerce-soundscan'); ?>
+                </a>
+                <hr />
+                <h3>
+                    <?php _e('Ignored Order Products', 'woocommerce-soundscan'); ?>
+                </h3>
+                <p>
+                    <?php
+                    _e(
+                        'Order items that do not meet the soundscan criteria are listed here with the reason why.',
+                        'woocommerce-soundscan'
+                    );
+                    ?>
+                </p>
+                <?php if (count($this->formatter->invalids)) : ?>
+                <table class="invalid-results">
+                    <thead>
+                        <tr>
+                            <th>
+                            <?php _e('Product Name', 'woocommerce-soundscan') ?>
+                            </th>
+                            <th>
+                            <?php _e('Reason', 'woocommerce-soundscan') ?>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($this->formatter->invalids as $row) : ?>
+                        <tr>
+                            <td>
+                                <?php
+                                    printf(
+                                        esc_html__('%s', 'woocommerce-soundscan'),
+                                        $row['record']->get_name()
+                                    );
+                                ?>
+                            </td>
+                            <td>
+                            <?php echo $row['reason']; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
             <?php else : ?>
                 <?php $this->outputNoResultsHTML(); ?>
                 <?php if (!$this->formatter->hasNecessaryOptions()) : ?>
@@ -387,7 +455,31 @@ if (!class_exists('AW\WSS\Menu')) {
                     </p>
                 <?php endif; ?>
             <?php endif; ?>
+           </div>
             <?php
+        }
+
+        /**
+         * Set Formatter and Relevant Report Dates
+         * @param \DateTimeImmutable $to=null   To Date for Soundscan Report
+         * @param \DateTimeImmutable $from=null From Date for Soundscan Report
+         * @return void
+         */
+        private function setFormatterAndDates(
+            \DateTimeImmutable $from = null,
+            \DateTimeImmutable $to = null
+        ) {
+            $this->to = $to ?? new \DateTimeImmutable();
+
+            if ($this->type === 'physical') {
+                $from = $from ?? $this->to->modify('last ' . PhysicalSchedule::SUBMIT_DAY);
+                $this->from = $from->setTime(0, 0, 0);
+                $this->formatter = new PhysicalFormatter($this->to, $this->from);
+            } else {
+                $from = $from ?? $this->to->modify('last ' . DigitalSchedule::SUBMIT_DAY);
+                $this->from = $from->setTime(0, 0, 0);
+                $this->formatter = new DigitalFormatter($this->to, $this->from);
+            }
         }
 
         /**
