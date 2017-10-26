@@ -18,21 +18,21 @@ import moment from 'moment'
                 if (to.isValid() && from.isValid()) {
                     let request = $.ajax({
                             data: {
-                                to.format('YYYYMMDD'),
-                                from.format('YYYYMMDD')
+                                to: to.format('YYYYMMDD'),
+                                from: from.format('YYYYMMDD')
                             },
                             dataType: 'json'
                         }),
                         minTimerPromise = new Promise(function(resolve) {
-                            $spinner.css({display: 'block'});
+                            $spinner.show();
                             
                            window.setTimeout(function() {
-                               $spinner.css({display: 'none'});
+                               $spinner.hide();
                                resolve();
                            }, 1500) 
                         });
                     
-                    $errorOutput.css({display: 'none'});
+                    $errorOutput.hide();
                     
                     Promise.all([request, minTimerPromise]).then(function([response]) {
                         if (response.data.hasOwnProperty('success') &&
@@ -42,7 +42,7 @@ import moment from 'moment'
                             throw new Error();
                         }
                     }).catch(function() {
-                        $errorOutput.css({display: 'block'});
+                        $errorOutput.show();
                     });
                 }
             }

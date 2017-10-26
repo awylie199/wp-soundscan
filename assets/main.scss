@@ -17,6 +17,11 @@ $white: #fff;
     }
 }
 
+.wss-dates-spinner,
+.wss-dates-error {
+    display: none;
+}
+
 .wp-core-ui .wss-export-btn {
 	margin-top: 1em;
 }

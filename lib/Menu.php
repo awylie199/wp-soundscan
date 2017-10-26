@@ -297,7 +297,7 @@ if (!class_exists('AW\WSS\Menu')) {
                 </label>
                 <input id="wss-to" type="text" class="datepicker" name="to" value="<?php echo $this->to->format($dateFormat); ?>" />
             </div>
-            <div id="wss-dates-spinner" class="spinner"></div>
+            <div id="wss-dates-spinner" class="spinner wss-dates-spinner"></div>
             <p id="wss-dates-error" class="wss-dates-error">
                  <?php _e('An error has ocurred trying to change the dates. Please check your woocommerce logs.', 'woocommerce-soundscan'); ?>
             </p>
