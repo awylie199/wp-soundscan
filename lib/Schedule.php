@@ -41,7 +41,7 @@ if (!class_exists('\AW\WSS\Schedule')) {
             'source'    =>  'soundscan'
         ];
 
-        public function __construct()
+        protected function __construct()
         {
             $this->logger = wc_get_logger();
             $this->className = (new \ReflectionClass(static::class))->getShortName();

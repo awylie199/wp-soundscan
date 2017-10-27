@@ -89,6 +89,7 @@ if (!class_exists('AW\WSS\Menu')) {
         public function __construct()
         {
             $this->logger = wc_get_logger();
+
             add_action('admin_post_' . self::DOWNLOAD_REPORT_ACTION, [$this, 'handleDownload']);
             add_action('wp_ajax_' . self::DATES_CHANGE_ACTION, [$this, 'handleDatesChange']);
             add_action('admin_menu', [$this, 'addSubMenu']);
@@ -136,7 +137,6 @@ if (!class_exists('AW\WSS\Menu')) {
                 'https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css'
             );
             wp_enqueue_style('jquery-ui');
-
             wp_enqueue_style(
                 self::ADMIN_STYLE,
                 $url . 'woocommerce-soundscan/dist/main.css',
@@ -224,7 +224,8 @@ if (!class_exists('AW\WSS\Menu')) {
 
                     if ($from !== false && $to !== false) {
                         ob_start();
-                        $this->outputTableHTML($from, $to);
+                        $this->setFormatterAndDates($from, $to);
+                        $this->outputTableHTML();
                         $html = ob_get_clean();
                         ob_end_clean();
                         wp_send_json_success($html);
@@ -281,13 +282,18 @@ if (!class_exists('AW\WSS\Menu')) {
          */
         private function outputDatePickersHTML()
         {
+            $this->setFormatterAndDates();
             $url = wp_nonce_url(
                 admin_url('admin-ajax.php'),
                 self::DATES_CHANGE_ACTION, self::MENU_NONCE_NAME
             );
+            $url = add_query_arg('action', self::DATES_CHANGE_ACTION, $url);
             $dateFormat = get_option('date_format');
+            $momentFormat = $this->convertPHPToMomentFormat($dateFormat);
+            $jqueryFormat = $this->convertPHPTojQueryFormat($dateFormat);
+
             ?>
-            <div id="wss-dates" class="wss-dates" data-url="<?php echo esc_url($url); ?>">
+            <div id="wss-dates" class="wss-dates" data-url="<?php echo esc_url($url); ?>" data-jquery-date-format="<?php echo esc_attr($jqueryFormat); ?>" data-moment-date-format="<?php echo esc_attr($momentFormat); ?>">
                 <label for="wss-to">
                     <?php _e('From', 'woocommerce-soundscan'); ?>
                 </label>
@@ -296,10 +302,15 @@ if (!class_exists('AW\WSS\Menu')) {
                     <?php _e('To', 'woocommerce-soundscan'); ?>
                 </label>
                 <input id="wss-to" type="text" class="datepicker" name="to" value="<?php echo $this->to->format($dateFormat); ?>" />
+            	<div id="wss-dates-spinner" class="spinner wss-dates-spinner"></div>
             </div>
-            <div id="wss-dates-spinner" class="spinner wss-dates-spinner"></div>
             <p id="wss-dates-error" class="wss-dates-error">
-                 <?php _e('An error has ocurred trying to change the dates. Please check your woocommerce logs.', 'woocommerce-soundscan'); ?>
+                <span class="wss-dates-error__server">
+                     <?php _e('An error has ocurred trying to change the dates. Please check your woocommerce logs.', 'woocommerce-soundscan'); ?>
+                </span>
+                <span class="wss-dates-error__dates">
+                     <?php _e('Your dates are invalid. The start date can\'t be after the end date. Please check your WordPress date format setting.', 'woocommerce-soundscan'); ?>
+                </span>
             </p>
             <hr />
             <?php
@@ -340,11 +351,7 @@ if (!class_exists('AW\WSS\Menu')) {
          * Output HTML for the Formatted Soundscan Results (or Lack Of)
          * @return void
          */
-        private function outputTableHTML(
-            \DateTimeImmutable $from = null,
-            \DateTimeImmutable $to = null
-        ) {
-            $this->setFormatterAndDates($from, $to);
+        private function outputTableHTML() {
             $rows = $this->formatter->getFormattedResults();
             $url = add_query_arg(
                 'action',
@@ -354,7 +361,7 @@ if (!class_exists('AW\WSS\Menu')) {
             $downloadURL = wp_nonce_url(
                 $url,
                 self::DOWNLOAD_REPORT_ACTION,
-                self::DOWNLOAD_REPORT_NAME
+                self::MENU_NONCE_NAME
             );
 
             ?>
@@ -503,6 +510,134 @@ if (!class_exists('AW\WSS\Menu')) {
                 </h2>
             </div>
             <?php
+        }
+
+        /**
+         * Convert PHP Date Format to jQuery UI Format
+         * @link https://stackoverflow.com/questions/16702398/convert-a-php-date-format-to-a-jqueryui-datepicker-date-format
+         * @param string $format        PHP Date Format to Convert
+         * @return string               Equivalent jQuery UI Date Format
+         */
+        private function convertPHPTojQueryFormat(string $format): string
+        {
+            $symbols = array(
+                // Day
+                'd' => 'dd',
+                'D' => 'D',
+                'j' => 'd',
+                'l' => 'DD',
+                'N' => '',
+                'S' => '',
+                'w' => '',
+                'z' => 'o',
+                // Week
+                'W' => '',
+                // Month
+                'F' => 'MM',
+                'm' => 'mm',
+                'M' => 'M',
+                'n' => 'm',
+                't' => '',
+                // Year
+                'L' => '',
+                'o' => '',
+                'Y' => 'yy',
+                'y' => 'y',
+                // Time
+                'a' => '',
+                'A' => '',
+                'B' => '',
+                'g' => '',
+                'G' => '',
+                'h' => '',
+                'H' => '',
+                'i' => '',
+                's' => '',
+                'u' => ''
+            );
+            $jqueryFormat = "";
+            $escaping = false;
+
+            for ($i = 0; $i < strlen($format); $i++) {
+                $char = $format[$i];
+
+                // PHP date format escaping character
+                if($char === '\\') {
+                    $i++;
+
+                    if ($escaping) {
+                        $jqueryFormat .= $format[$i];
+                    } else {
+                        $jqueryFormat .= '\'' . $format[$i];
+                    }
+
+                    $escaping = true;
+                } else {
+                    if ($escaping) {
+                        $jqueryFormat .= "'";
+                        $escaping = false;
+                    }
+
+                    if (isset($symbols[$char])) {
+                        $jqueryFormat .= $symbols[$char];
+                    } else {
+                        $jqueryFormat .= $char;
+                    }
+                }
+            }
+
+            return $jqueryFormat;
+        }
+
+        /**
+         * Convert PHP to Moment JS Format
+         * @param string $format        PHP Date Format
+         * @return string               Equivalent Moment JS Format
+         */
+        private function convertPHPToMomentFormat(string $format): string
+        {
+            $replacements = [
+                'd' => 'DD',
+                'D' => 'ddd',
+                'j' => 'D',
+                'l' => 'dddd',
+                'N' => 'E',
+                'S' => 'o',
+                'w' => 'e',
+                'z' => 'DDD',
+                'W' => 'W',
+                'F' => 'MMMM',
+                'm' => 'MM',
+                'M' => 'MMM',
+                'n' => 'M',
+                't' => '', // no equivalent
+                'L' => '', // no equivalent
+                'o' => 'YYYY',
+                'Y' => 'YYYY',
+                'y' => 'YY',
+                'a' => 'a',
+                'A' => 'A',
+                'B' => '', // no equivalent
+                'g' => 'h',
+                'G' => 'H',
+                'h' => 'hh',
+                'H' => 'HH',
+                'i' => 'mm',
+                's' => 'ss',
+                'u' => 'SSS',
+                'e' => 'zz', // deprecated since version 1.6.0 of moment.js
+                'I' => '', // no equivalent
+                'O' => '', // no equivalent
+                'P' => '', // no equivalent
+                'T' => '', // no equivalent
+                'Z' => '', // no equivalent
+                'c' => '', // no equivalent
+                'r' => '', // no equivalent
+                'U' => 'X',
+            ];
+            $momentFormat = strtr($format, $replacements);
+
+            return $momentFormat;
         }
     }
 } else {

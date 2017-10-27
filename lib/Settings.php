@@ -315,8 +315,8 @@ if (!class_exists('AW\WSS\Settings')) {
         public function handleSave(array $oldValue)
         {
             $newOptions = get_option(self::NAME);
-            $digitalSchedule = new DigitalSchedule();
-            $physicalSchedule = new PhysicalSchedule();
+            $digitalSchedule = DigitalSchedule::instance();
+            $physicalSchedule = PhysicalSchedule::instance();
 
             if (is_array($newOptions)) {
                 $digitalOption = $newOptions['cronDigitalSubmissions'] ?? '';

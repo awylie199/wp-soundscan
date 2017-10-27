@@ -1,4 +1,5 @@
 $white: #fff;
+$red: #dc3232;
 
 .form-table .wss-settings-select {
     height: 33px;
@@ -17,13 +18,32 @@ $white: #fff;
     }
 }
 
+.wss-dates-spinner {
+    float: none;
+}
+
 .wss-dates-spinner,
 .wss-dates-error {
+    visibility: hidden;
+}
+
+.wss-dates-error {
+    background: $white;
+    border-left: 3px solid $red;
+    display: inline-block;
+    padding: .75em 1em;
+}
+
+.wss-dates-error__dates {
+    display: none;
+}
+
+.wss-dates-error__server {
     display: none;
 }
 
 .wp-core-ui .wss-export-btn {
-	margin-top: 1em;
+    margin-top: 1em;
 }
 
 .report-results,
