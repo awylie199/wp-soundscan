@@ -5,6 +5,7 @@ import moment from 'moment';
     $(function() {
         let $dates = $('#wss-dates'),
             url = $dates.data('url'),
+            type = $dates.data('type'),
             jqueryDateFormat = $dates.data('jquery-date-format'),
             momentDateFormat = $dates.data('moment-date-format'),
             $spinner = $('#wss-dates-spinner'),
@@ -26,7 +27,8 @@ import moment from 'moment';
                                 method: 'GET',
                                 data: {
                                     to: to.format('YYYYMMDD'),
-                                    from: from.format('YYYYMMDD')
+                                    from: from.format('YYYYMMDD'),
+                                    type
                                 },
                                 dataType: 'json'
                             }),

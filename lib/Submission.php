@@ -16,6 +16,18 @@ if (!class_exists('\AW\WSS\Submission')) {
     class Submission
     {
         /**
+         * Option Name for Logs
+         * @var string
+         */
+        const LOGS_OPTION_NAME = 'woocommerce-soundscan-logs';
+
+        /**
+         * Date Format for Logs
+         * @var string
+         */
+        const LOGS_DATE_FORMAT = 'Ymd H:i:s';
+
+        /**
          * FTP Stream Connection
          * @var null|resource
          */
@@ -79,6 +91,94 @@ if (!class_exists('\AW\WSS\Submission')) {
         }
 
         /**
+         * Check Whether the Report Has Already Been Uploaded For this Week
+         * @return bool             True if Already Uploaded
+         */
+        public function isAlreadyUploaded(): bool
+        {
+            $logs = get_option(self::LOGS_OPTION_NAME, []);
+
+            if (is_string($logs)) {
+                $logs = unserialize($logs);
+            }
+
+            $logs = array_reverse($logs);
+
+            foreach ($logs as $log) {
+                if ($log['type'] === $this->formatter::FORMATTER_TYPE &&
+                    $log['result'] === true) {
+                        $logDate = \DateTimeImmutable::createFromFormat(
+                            self::LOGS_DATE_FORMAT,
+                            $log['date']
+                            );
+
+                        return ($logDate > $this->formatter->startDate &&
+                            $logDate < $this->formatter->endDate);
+                    }
+            }
+
+            return false;
+        }
+
+        /**
+         * Upload Soundscan Submission to Nielsen FTP Server
+         * @return bool                 True if Upload Appears Successful
+         */
+        public function upload(): bool
+        {
+            $successful = false;
+            $submission = implode(PHP_EOL, $this->formatter->getFormattedResults());
+            $this->logger->notice(
+                __('Starting Soundscan upload', 'woocommerce-soundscan'),
+                $this->context
+                );
+
+            try {
+                $this->connect();
+                $filePath = $this->getTempFile($submission);
+                $remoteFileName = $this->getRemoteFileName();
+
+                $this->sftpConnection->put(
+                    $remoteFileName,
+                    $filePath,
+                    SFTP::SOURCE_LOCAL_FILE
+                );
+
+                $this->checkRemote($remoteFileName);
+                $this->logger->notice(
+                    __(
+                        'Successfully uploaded new Nielsen Soundscan report',
+                        'woocommerce-soundscan'
+                    )
+                );
+                $successful = true;
+            } catch (\Exception $err) {
+                $this->logger->error(
+                    sprintf(
+                        __(
+                            'Error in Soundscan Upload: %1$s',
+                            'woocommerce-soundscan'
+                            ),
+                        $err->getMessage()
+                        ),
+                    $this->context
+                );
+            } finally {
+                if (is_resource($this->sftpConnection)) {
+                    $this->sftpConnection->disconnect();
+                    unset($this->sftpConnection);
+                }
+                if (isset($filePath) && file_exists($filePath)) {
+                    unlink($filePath);
+                }
+
+                $this->updateLogs($successful);
+
+                return $successful;
+            }
+        }
+
+        /**
          * Set Connection Details Based on Data and Type
          * @return void
          */
@@ -126,68 +226,12 @@ if (!class_exists('\AW\WSS\Submission')) {
         }
 
         /**
-         * Upload Soundscan Submission to Nielsen FTP Server
-         * @return bool                    True if Successful Upload
-         */
-        public function upload(): bool
-        {
-            $successful = false;
-            $submission = implode(PHP_EOL, $this->formatter->getFormattedResults());
-            $this->logger->notice(
-                __('Starting Soundscan upload', 'woocommerce-soundscan'),
-                $this->context
-            );
-
-            try {
-                $this->connect();
-                $filePath = $this->getTempFile($submission);
-                $remoteFileName = $this->getRemoteFileName();
-
-                $this->sftpConnection->put(
-                    $remoteFileName,
-                    $filePath,
-                    SFTP::SOURCE_LOCAL_FILE
-                );
-
-                $this->check($remoteFileName);
-                $this->logger->notice(
-                    __(
-                        'Successfully uploaded new Nielsen Soundscan report',
-                        'woocommerce-soundscan'
-                    )
-                );
-                $successful = true;
-            } catch (\Exception $err) {
-                $this->logger->error(
-                    sprintf(
-                        __(
-                            'Error in Soundscan Upload: %1$s',
-                            'woocommerce-soundscan'
-                        ),
-                        $err->getMessage()
-                    ),
-                    $this->context
-                );
-            } finally {
-                if (is_resource($this->sftpConnection)) {
-                    $this->sftpConnection->disconnect();
-                    unset($this->sftpConnection);
-                }
-                if (isset($filePath) && file_exists($filePath)) {
-                    unlink($filePath);
-                }
-
-                return $successful;
-            }
-        }
-
-        /**
          * Check SFTP Upload to Nielsen via Stat
          * @param string  $remoteFileName      Remote FileName
-         * @throws \Exception  if the submission doesn't exist on Nielsen's SFTP Server
+         * @throws \Exception if the submission doesn't exist on Nielsen's SFTP Server
          * @return void
          */
-        private function check(string $remoteFileName)
+        private function checkRemote(string $remoteFileName)
         {
             $this->logger->debug(
                 __(
@@ -235,6 +279,29 @@ if (!class_exists('\AW\WSS\Submission')) {
             fclose($handle);
 
             return $tempName;
+        }
+
+        /**
+         * Update Logs for Uploaded Report with Result
+         * @param bool $result      Result of Nielsen Upload (True for Success)
+         * @return void
+         */
+        private function updateLogs(bool $result)
+        {
+            $date = new \DateTimeImmutable();
+            $logs = get_option(self::LOGS_OPTION_NAME, []);
+
+            if (is_string($logs)) {
+                $logs = unserialize($logs);
+            }
+
+            $logs[] = [
+                'date'  =>  $date->format(self::LOGS_DATE_FORMAT),
+                'result'=>  $result,
+                'type'  =>  $this->formatter::FORMATTER_TYPE
+            ];
+
+            update_option(self::LOGS_OPTION_NAME, $logs);
         }
     }
 } else {

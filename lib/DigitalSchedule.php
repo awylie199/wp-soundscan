@@ -21,12 +21,6 @@ if (!class_exists('\AW\WSS\DigitalSchedule')) {
         const SCHEDULE_ACTION = 'woocommerce-soundscan-digital-schedule';
 
         /**
-         * Name of Transient for Whether Report Has Been Submitted Recently
-         * @var string
-         */
-        const SUBMITTED_TRANSIENT = 'woocommerce-soundscan-digital-submitted';
-
-        /**
          * Day to Submit the Schedule (e.g. Monday)
          * @var string
          */

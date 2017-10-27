@@ -11,6 +11,7 @@ use AW\WSS\DigitalFormatter;
 use AW\WSS\PhysicalSchedule;
 use AW\WSS\DigitalSchedule;
 use AW\WSS\Data;
+use AW\WSS\Submission;
 
 if (!class_exists('AW\WSS\Menu')) {
     /**
@@ -49,6 +50,12 @@ if (!class_exists('AW\WSS\Menu')) {
         const DATES_CHANGE_ACTION = 'woocommerce_soundscan_dates_change';
 
         /**
+         * Download Report WordPress Hook Action
+         * @var string
+         */
+        const UPLOAD_REPORT_ACTION = 'woocommerce_soundscan_upload';
+
+        /**
          * Data Formatter for Handling Soundscan Records
          * @var null|\AW\WSS\Formatter
          */
@@ -79,6 +86,12 @@ if (!class_exists('AW\WSS\Menu')) {
         private $logger = null;
 
         /**
+         * WordPress Sub Menu Tab (From $_GET)
+         * @var string
+         */
+        private $tab = '';
+
+        /**
          * WooCommerce Logger Context for Soundscan
          * @var string[]
          */
@@ -91,11 +104,14 @@ if (!class_exists('AW\WSS\Menu')) {
             $this->logger = wc_get_logger();
 
             add_action('admin_post_' . self::DOWNLOAD_REPORT_ACTION, [$this, 'handleDownload']);
+            add_action('admin_post_' . self::UPLOAD_REPORT_ACTION, [$this, 'handleUpload']);
             add_action('wp_ajax_' . self::DATES_CHANGE_ACTION, [$this, 'handleDatesChange']);
             add_action('admin_menu', [$this, 'addSubMenu']);
             add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
 
-            if (isset($_GET['tab'])) {
+            $this->tab = $_GET['tab'] ?? '';
+
+            if ($this->tab === 'physical' || $this->tab === 'digital') {
                 $this->type = $_GET['tab'];
             }
         }
@@ -167,8 +183,19 @@ if (!class_exists('AW\WSS\Menu')) {
                     <a class="<?php echo esc_attr($this->getNavClass('logs')); ?>" href="<?php echo esc_url($this->getTabLink('logs')); ?>">
                         <?php _e('Submission Logs', 'woocommerce-soundscan'); ?>
                     </a>
+                    <a class="<?php echo esc_attr($this->getNavClass('about')); ?>" href="<?php echo esc_url($this->getTabLink('about')); ?>">
+                        <?php _e('About', 'woocommerce-soundscan'); ?>
+                    </a>
                 </nav>
-                <?php $this->outputResultsHTML(); ?>
+                <?php
+                if (empty($this->tab) || $this->tab === 'physical' || $this->tab === 'digital') {
+                    $this->outputResultsHTML();
+                } elseif ($this->tab === 'logs') {
+                    $this->outputLogsHTML();
+                } else {
+                    $this->outputAboutHTML();
+                }
+                ?>
             </div>
             <?php
         }
@@ -221,10 +248,12 @@ if (!class_exists('AW\WSS\Menu')) {
                         'Ymd',
                         $_GET['to'] ?? ''
                     );
+                    $type = $_GET['type'] ?? '';
 
-                    if ($from !== false && $to !== false) {
-                        ob_start();
+                    if ($from !== false && $to !== false && !empty($type)) {
+                        $this->type = $type;
                         $this->setFormatterAndDates($from, $to);
+                        ob_start();
                         $this->outputTableHTML();
                         $html = ob_get_clean();
                         ob_end_clean();
@@ -248,6 +277,65 @@ if (!class_exists('AW\WSS\Menu')) {
         }
 
         /**
+         * Handle Manual Upload of Report
+         * @return void
+         */
+        public function handleUpload()
+        {
+            if (current_user_can('manage_options')) {
+                $name = $_GET[self::MENU_NONCE_NAME] ?? '';
+                $errorCode = 0;
+
+                if (wp_verify_nonce($name, self::UPLOAD_REPORT_ACTION)) {
+                    $successful = false;
+                    $this->setFormatterAndDates();
+
+                    try {
+                        if ($this->formatter->hasNecessaryOptions()) {
+                            $submitter = new Submission($this->formatter);
+
+                            if ($submitter->hasNecessaryOptions()) {
+                                if (!$submitter->isAlreadyUploaded()) {
+                                    $successful = $submitter->upload();
+                                } else {
+                                    throw new \Exception('An upload has already been made for this week.', 1);
+                                }
+                            } else {
+                                throw new \Exception('The report lacks the necessary details.', 2);
+                            }
+                        } else {
+                            throw new \Exception('The report lacks the necessary details.', 2);
+                        }
+                    } catch (\Exception $err) {
+                        $this->logger(
+                            sprintf(
+                                __(
+                                    'Error in Soundscan Manual Upload: %s',
+                                    'woocommerce-soundscan'
+                                ),
+                                $err->getMessage()
+                            ),
+                            $this->context
+                        );
+                        $errorCode = $err->getCode();
+                    } finally {
+                        $url = add_query_arg([
+                            'page'          =>  'soundscan',
+                            'tab'           =>  $this->tab,
+                            'successful'    =>  $successful,
+                            'errorCode'       =>  $errorCode
+                        ], esc_url(admin_url('admin.php')));
+                        wp_safe_redirect($url);
+                    }
+                } else {
+                    exit;
+                }
+            } else {
+                exit;
+            }
+        }
+
+        /**
          * Get Nav Classes (Based on POST Args)
          * @param string $tab       Tab Slug
          * @return string           Classes for Tab Element
@@ -256,7 +344,7 @@ if (!class_exists('AW\WSS\Menu')) {
         {
             $class = 'nav-tab';
 
-            if ($this->type === $tab) {
+            if ($this->tab === $tab) {
                 $class .= ' nav-tab-active';
             }
 
@@ -293,7 +381,7 @@ if (!class_exists('AW\WSS\Menu')) {
             $jqueryFormat = $this->convertPHPTojQueryFormat($dateFormat);
 
             ?>
-            <div id="wss-dates" class="wss-dates" data-url="<?php echo esc_url($url); ?>" data-jquery-date-format="<?php echo esc_attr($jqueryFormat); ?>" data-moment-date-format="<?php echo esc_attr($momentFormat); ?>">
+            <div id="wss-dates" class="wss-dates" data-url="<?php echo esc_url($url); ?>" data-jquery-date-format="<?php echo esc_attr($jqueryFormat); ?>" data-moment-date-format="<?php echo esc_attr($momentFormat); ?>" data-type="<?php echo esc_attr($this->type); ?>">
                 <label for="wss-to">
                     <?php _e('From', 'woocommerce-soundscan'); ?>
                 </label>
@@ -309,7 +397,7 @@ if (!class_exists('AW\WSS\Menu')) {
                      <?php _e('An error has ocurred trying to change the dates. Please check your woocommerce logs.', 'woocommerce-soundscan'); ?>
                 </span>
                 <span class="wss-dates-error__dates">
-                     <?php _e('Your dates are invalid. The start date can\'t be after the end date. Please check your WordPress date format setting.', 'woocommerce-soundscan'); ?>
+                     <?php _e('Your dates are invalid. The start date can\'t be after the end date. If the problem persists, please check your WordPress date format setting and try a different date format.', 'woocommerce-soundscan'); ?>
                 </span>
             </p>
             <hr />
@@ -339,7 +427,7 @@ if (!class_exists('AW\WSS\Menu')) {
             </h3>
             <p>
             <?php if ($this->type === 'physical') : ?>
-                <?php _e('Physical reports are done from Thursday to Wednesday.', 'woocommerce-soundscan'); ?>
+                <?php _e('Physical reports are done from Tuesday to Monday.', 'woocommerce-soundscan'); ?>
             <?php else : ?>
                 <?php _e('Digital reports are done from Monday to Sunday.', 'woocommerce-soundscan'); ?>
             <?php endif; ?>
@@ -353,14 +441,24 @@ if (!class_exists('AW\WSS\Menu')) {
          */
         private function outputTableHTML() {
             $rows = $this->formatter->getFormattedResults();
-            $url = add_query_arg(
+            $downloadURL = add_query_arg(
                 'action',
                 self::DOWNLOAD_REPORT_ACTION,
                 admin_url('admin-post.php')
             );
             $downloadURL = wp_nonce_url(
-                $url,
+                $downloadURL,
                 self::DOWNLOAD_REPORT_ACTION,
+                self::MENU_NONCE_NAME
+            );
+            $uploadURL = add_query_arg(
+                'action',
+                self::UPLOAD_REPORT_ACTION,
+                admin_url('admin-post.php')
+            );
+            $uploadURL = wp_nonce_url(
+                $uploadURL,
+                self::UPLOAD_REPORT_ACTION,
                 self::MENU_NONCE_NAME
             );
 
@@ -404,7 +502,7 @@ if (!class_exists('AW\WSS\Menu')) {
                 </a>
                 <hr />
                 <h3>
-                    <?php _e('Ignored Order Products', 'woocommerce-soundscan'); ?>
+                    <?php _e('Ineligible Order Products', 'woocommerce-soundscan'); ?>
                 </h3>
                 <p>
                     <?php
@@ -419,6 +517,9 @@ if (!class_exists('AW\WSS\Menu')) {
                     <thead>
                         <tr>
                             <th>
+                            <?php _e('Order ID', 'woocommerce-soundscan'); ?>
+                            </th>
+                            <th>
                             <?php _e('Product Name', 'woocommerce-soundscan') ?>
                             </th>
                             <th>
@@ -431,10 +532,18 @@ if (!class_exists('AW\WSS\Menu')) {
                         <tr>
                             <td>
                                 <?php
-                                    printf(
-                                        esc_html__('%s', 'woocommerce-soundscan'),
-                                        $row['record']->get_name()
-                                    );
+                               printf(
+                                   esc_html__('%d', 'woocommerce-soundscan'),
+                                   $row['record']->get_order_id()
+                               );
+                               ?>
+                            </td>
+                            <td>
+                                <?php
+                                printf(
+                                    esc_html__('%s', 'woocommerce-soundscan'),
+                                    $row['record']->get_name()
+                                );
                                 ?>
                             </td>
                             <td>
@@ -449,19 +558,61 @@ if (!class_exists('AW\WSS\Menu')) {
                 <?php $this->outputNoResultsHTML(); ?>
                 <?php if (!$this->formatter->hasNecessaryOptions()) : ?>
                     <p>
-                        <?php
-                            printf(
-                                __(
-                                    'Add your %1$sdetails%2$s to get started',
-                                    'woocommerce-soundscan'
-                                ),
-                                '<a href="' . Notifications::getSettingsURL() . '">',
-                                '</a>'
-                            );
-                        ?>
+                    <?php
+                        printf(
+                            __(
+                                'Add your %1$sdetails%2$s to get started',
+                                'woocommerce-soundscan'
+                            ),
+                            '<a href="' . Notifications::getSettingsURL() . '">',
+                            '</a>'
+                        );
+                    ?>
                     </p>
                 <?php endif; ?>
             <?php endif; ?>
+           </div>
+           <hr />
+           <div>
+                <h3>
+                <?php _e('Manual Upload', 'woocommerce-soundscan'); ?>
+                </h3>
+                <p>
+                <?php
+                printf(
+                    __(
+                        'Upload this week\'s report? To undo this action you must %1$smanually delete%2$s the file from Nielsen\'s FTP server.',
+                        'woocommerce-soundscan'
+                    ),
+                    '<strong>',
+                    '</strong>'
+                );
+                ?>
+                </p>
+                <p>
+                <?php _e('If the upload is successful, it will not be uploaded automatically for this week.', 'woocommerce-soundscan'); ?>
+                </p>
+                <a class="button button-primary" href="<?php echo esc_url($uploadURL); ?>">
+                <?php _e('Upload', 'woocommerce-soundscan') ?>
+                </a>
+                <p class="wss-upload-error <?php echo (isset($_GET['errorCode']) && (int)$_GET['errorCode'] === 2 ? 'wss-upload-error--visible' : ''); ?>">
+                <?php
+                printf(
+                    __(
+                        'The report was not uploaded. Please complete your Soundscan %1$ssettings%2$s to upload successfully.',
+                        'woocommerce-soundscan'
+                    ),
+                    '<a href="' . Notifications::getSettingsURL() . '">',
+                    '</a>'
+                );
+                ?>
+                </p>
+                <p class="wss-upload-error <?php echo (isset($_GET['errorCode']) && (int)$_GET['errorCode'] === 1 ? 'wss-upload-error--visible' : ''); ?>">
+                <?php _e('The report was not uploaded. It has already been uploaded for this period.', 'woocommerce-soundscan'); ?>
+                </p>
+                <p class="wss-upload-success <?php echo (isset($_GET['errorCode']) && (int)$_GET['errorCode'] === 0 ? 'wss-upload-success--visible' : ''); ?>">
+                <?php _e('Success!', 'woocommerce-soundscan'); ?>
+                </p>
            </div>
             <?php
         }
@@ -638,6 +789,224 @@ if (!class_exists('AW\WSS\Menu')) {
             $momentFormat = strtr($format, $replacements);
 
             return $momentFormat;
+        }
+
+        /**
+         * Output Logs HTML for Soundscan Submissions via FTP
+         * @return void
+         */
+        private function outputLogsHTML()
+        {
+            $logs = get_option(Submission::LOGS_OPTION_NAME, []);
+            $dateFormat = get_option('date_format', 'm-d-Y');
+            $timeFormat = get_option('time_format', 'H:i:s');
+
+            if (is_string($logs)) {
+                $logs = unserialize($logs);
+            }
+            ?>
+            <h2>
+            <?php _e('Soundscan Submission Logs', 'woocommerce-soundscan'); ?>
+            </h2>
+            <hr />
+            <?php if (count($logs)) : ?>
+            <p>
+            <?php _e('Check your WooCommerce logs for more detail on unsuccessful submissions', 'woocommerce-soundscan'); ?>
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>
+                        <?php _e('Date', 'woocommerce-soundscan'); ?>
+                        </th>
+                        <th>
+                        <?php _e('Time', 'woocommerce-soundscan'); ?>
+                        </th>
+                        <th>
+                        <?php _e('Type', 'woocommerce-soundscan'); ?>
+                        </th>
+                        <th>
+                        <?php _e('Result', 'woocommerce-soundscan'); ?>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($logs as $log) : ?>
+                    <?php $date = \DateTimeImmutable::createFromFormat(Submission::LOGS_DATE_FORMAT, $log['date']); ?>
+                    <tr>
+                        <td>
+                        <?php printf(__('%s', 'woocommerce-soundscan'), $date->format($dateFormat)); ?>
+                        </td>
+                        <td>
+                        <?php printf(__('%s', 'woocommerce-soundscan'), $date->format($timeFormat)); ?>
+                        </td>
+                        <td>
+                        <?php printf(__('%s', 'woocommerce-soundscan'), $log['type']); ?>
+                        </td>
+                        <td>
+                        <?php printf(__('%s', 'woocommerce-soundscan'), $log['result'] === true ? 'Successful' : 'Failed'); ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php else : ?>
+            <p>
+            <?php _e('You have not submitted any Soundscan reports to Nielsen.', 'woocommerce-soundscan'); ?>
+            </p>
+            <?php endif; ?>
+            <?php
+        }
+
+        /**
+         * Output About Tab HTML for Soundscan Submissions
+         * @return void
+         */
+        private function outputAboutHTML()
+        {
+            ?>
+            <h3>
+            <?php _e('About', 'woocommerce-soundscan'); ?>
+            </h3>
+            <hr />
+            <h4>
+            <?php _e('WooCommerce Soundscan Plugin', 'woocommerce-soundscan'); ?>
+            </h4>
+            <p>
+            <?php _e('The WooCommerce Soundscan plugin allows you to submit weekly digital and physical music sales to Nielsen from your WooCommerce shop.', 'woocommerce-soundscan');?>
+            </p>
+            <h4>
+            <?php _e('Contact', 'woocommerce-soundscan'); ?>
+            </h4>
+            <p>
+            <?php _e('The plugin was created by FuzzyBears, a UK web development team.', 'woocommerce-soundscan'); ?>
+            </p>
+            <p>
+            <?php
+               printf(
+                   __(
+                       'If we can help with this plugin, please do not hesitate to contact us at %1$shi@fuzzybears.co.uk%2$s. We\'re also available for work.',
+                       'woocommerce-soundscan'
+                   ),
+                   '<a href="mailto:hi@fuzzybears.co.uk">',
+                   '</a>'
+               );
+            ?>
+            </p>
+            <address>
+                <a href="https://fuzzybears.co.uk">
+                <?php _e('https://fuzzybears.co.uk', 'woocommerce-soundscan'); ?>
+                </a>
+            </address>
+            <hr />
+            <h4>
+            <?php _e('Physical Format', 'woocommerce-soundscan'); ?>
+            </h4>
+            <p>
+            <?php _e('The Nielsen Soundscan report for physical music sales must conform to the following format:', 'woocommerce-soundscan'); ?>
+            </p>
+            <dl>
+                <dt>
+                    <strong><?php _e('A Header Row Comprised Of:', 'woocommerce-soundscan'); ?></strong>
+                </dt>
+                <dd>
+                    <ol>
+                        <li><?php _e('Your Chain Number (Assigned by Nielsen)', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('Your Account Number (Assigned by Nielsen)', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The current date (YYMMDD)', 'woocommerce-soundscan'); ?></li>
+                    </ol>
+                </dd>
+                <dt>
+                    <strong><?php _e('A Row Per Sold Item Comprised of:'); ?></strong>
+                </dt>
+                <dd>
+                    <ol>
+                        <li><?php _e('"M3", A Fixed Prefix', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The Product EAN (or UPC)', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The Customer\'s U.S. Zip Code (Truncated to 5 Digits)', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('"S", for Sale, or "R" for Refund', 'woocommerce-soundscan'); ?></li>
+                    </ol>
+                </dd>
+                <dt>
+                    <strong><?php _e('A Footer Row Comprised Of:', 'woocommerce-soundscan'); ?></strong>
+                </dt>
+                <dd>
+                    <ol>
+                        <li><?php _e('"94", A Fixed Prefix', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('Total Sales Plus Refunds', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('Total Sales', 'woocommerce-soundscan'); ?></li>
+                    </ol>
+                </dd>
+            </dl>
+            <hr />
+            <h4>
+            <?php _e('Digital Format', 'woocommerce-soundscan'); ?>
+            </h4>
+            <p>
+            <?php _e('The Nielsen Soundscan report for digital music sales must conform to the following format:', 'woocommerce-soundscan'); ?>
+            </p>
+            <dl>
+                <dt>
+                    <strong><?php _e('A Header Row Comprised Of:', 'woocommerce-soundscan'); ?></strong>
+                </dt>
+                <dd>
+                    <ol>
+                        <li><?php _e('Your Chain Number (Assigned by Nielsen)', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('Your Account Number (Assigned by Nielsen)', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The current date (YYMMDD)', 'woocommerce-soundscan'); ?></li>
+                    </ol>
+                </dd>
+                <dt>
+                    <strong><?php _e('A Row Per Sold Item Comprised of:', 'woocommerce-soundscan'); ?></strong>
+                </dt>
+                <dd>
+                    <ol>
+                        <li><?php _e('"D3", A Fixed Prefix', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The Product EAN (or UPC) for Albums', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The Customer\'s U.S. Zip Code (Truncated to 5 Digits)', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('"S", for Sale, or "R" for Refund', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The Sequential Position of the Item Within the Order', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The Product ISRC (or Internal ID) for Tracks', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('The Price Net of Tax and Deductions Without Decimal Points', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('"A" for Album and "S" for Single (Track)', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('"P" for PC or "M" for Mobile - Fixed at "P" Because WooCommerce Does Not Track the User\'s Device', 'woocommerce-soundscan'); ?></li>
+                    </ol>
+                </dd>
+                <dt>
+                    <strong><?php _e('A Footer Row Comprised Of:', 'woocommerce-soundscan'); ?></strong>
+                </dt>
+                <dd>
+                    <ol>
+                        <li><?php _e('"94", A Fixed Prefix', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('Total Sales Plus Refunds', 'woocommerce-soundscan'); ?></li>
+                        <li><?php _e('Total Sales', 'woocommerce-soundscan'); ?></li>
+                    </ol>
+                </dd>
+            </dl>
+            <hr />
+            <h4>
+            <?php _e('Submission Schedule', 'woocommerce-soundscan'); ?>
+            </h4>
+            <p>
+            <?php _e('This plugin is designed to submit reports weekly.', 'woocommerce-soundscan'); ?>
+            </p>
+            <p>
+            <?php _e('WordPress Cron is used to submit reports on time. Therefore a user must visit on the due date before 1PM EST for the upload to be made.', 'woocommerce-soundscan'); ?>
+            </p>
+            <p>
+            <?php _e('We always recommend manually checking the upload has been successful. The plugin authors cannot be held accountable for any missed uploads. It is highly recommended to check progress with Nielsen as their requirements may change.', 'woocommerce-soundscan'); ?>
+            </p>
+            <h4>
+            <?php _e('Digital Sales', 'woocommerce-soundscan'); ?>
+            </h4>
+            <?php _e('The digital sales report ranges from Monday to Sunday, and is due before Monday 1PM EST.', 'woocommerce-soundscan'); ?>
+            <h4>
+            <?php _e('Physical Sales', 'woocommerce-soundscan'); ?>
+            </h4>
+            <p>
+            <?php _e('The physical sales report ranges from Tuesday to Monday, and is due before Tuesday 1PM EST', 'woocommerce-soundscan'); ?>
+            </p>
+            <?php
         }
     }
 } else {

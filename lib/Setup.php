@@ -25,12 +25,13 @@ if (!class_exists('AW\WSS\Setup')) {
         {
             add_action('init', function () {
                 load_plugin_textdomain(
-                    'wc-soundscan',
+                    'woocommerce-soundscan',
                     false,
                     WC_SOUNDSCAN_DIR . '/languages'
                 );
             });
             add_filter('woocommerce_integrations', [$this, 'addIntegration']);
+            add_filter('admin_footer_text', [$this, 'pluginFooter']);
             new Settings();
             new Notifications();
             new Menu();
@@ -58,6 +59,28 @@ if (!class_exists('AW\WSS\Setup')) {
         {
             $integrations[] = Settings::class;
             return $integrations;
+        }
+
+        /**
+         * Display WooCommerce Soundscan Footer Message
+         * @return void
+         */
+        public function pluginFooter()
+        {
+            if (is_admin() && isset($_GET['page']) && $_GET['page'] === 'soundscan') {
+                printf(
+                    __(
+                        '%3$sDeveloped by %1$sFuzzyBears%2$s. Thankyou for using this plugin. Please %5$scontact us%6$s if you notice a bug or could use some help.%4$s',
+                        'woocommerce-soundscan'
+                    ),
+                    '<a href="https://fuzzybears.co.uk" target="_blank" rel="noopener noreferrer">',
+                    '</a>',
+                    '<i>',
+                    '</i>',
+                    '<a href="https://fuzzybears.co.uk/contact" target="_blank" rel="noopener noreferrer">',
+                    '</a>'
+                );
+            }
         }
 
         protected function __sleep()

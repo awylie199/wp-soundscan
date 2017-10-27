@@ -54,37 +54,39 @@ if (!class_exists('\AW\WSS\Schedule')) {
          */
         public function scheduleSubmission()
         {
-            $submitted = get_transient(static::SUBMITTED_TRANSIENT);
+            if ($this->isTimeToSubmit()) {
+                try {
+                    $formatter = $this->createFormatter();
 
-            if ($submitted !== true && $this->isTimeToSubmit()) {
-                $formatter = $this->createFormatter();
-                $submitter = new Submission();
+                    if ($formatter->hasNecessaryOptions()) {
+                        $submitter = new Submission($formatter);
 
-                if ($formatter->hasNecessaryOptions()) {
-                    if ($submitter->hasNecessaryOptions()) {
-                        $result = $submitter->upload();
-
-                        if ($result) {
-                            set_transient(
-                                self::SUBMITTED_TRANSIENT,
-                                true,
-                                DAY_IN_SECONDS
-                            );
+                        if ($submitter->hasNecessaryOptions()) {
+                            if (!$submitter->isAlreadyUploaded()) {
+                                $submitter->upload();
+                            } else {
+                                $this->logger->info(
+                                    __(
+                                        'Soundscan Schedule: Submitter has already made a successful upload for this period.',
+                                        'woocommerce-soundscan'
+                                    ),
+                                    $this->context
+                                );
+                            }
+                        } else {
+                            throw new \Exception('Submitter lacks necessary setting details to upload.');
                         }
                     } else {
-                        $this->logger->error(
+                        throw new \Exception('Formatter lacks necessary setting details to upload.');
+                    }
+                } catch (\Exception $err) {
+                    $this->logger->error(
+                        sprintf(
                             __(
-                                'Error in Soundscan Schedule: Submitter lacks necessary setting details to upload.',
+                                'Error in Soundscan Schedule: %s',
                                 'woocommerce-soundscan'
                             ),
-                            $this->context
-                        );
-                    }
-                } else {
-                    $this->logger->error(
-                        __(
-                            'Error in Soundscan Schedule: Formatter lacks necessary setting details to upload.',
-                            'woocommerce-soundscan'
+                            $err->getMessage()
                         ),
                         $this->context
                     );

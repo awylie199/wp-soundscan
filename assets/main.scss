@@ -1,5 +1,6 @@
 $white: #fff;
 $red: #dc3232;
+$green: #46b450;
 
 .form-table .wss-settings-select {
     height: 33px;
@@ -27,11 +28,28 @@ $red: #dc3232;
     visibility: hidden;
 }
 
-.wss-dates-error {
+.wss-dates-error,
+.wss-upload-error {
     background: $white;
     border-left: 3px solid $red;
     display: inline-block;
     padding: .75em 1em;
+}
+
+.wss-upload-success {
+    background: $white;
+    border-left: 3px solid $green;
+    display: inline-block;
+    padding: .75em 1em;
+}
+
+.wss-upload-error,
+.wss-upload-success {
+    display: none;
+
+    &--visible {
+        display: block;
+    }
 }
 
 .wss-dates-error__dates {

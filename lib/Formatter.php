@@ -39,13 +39,13 @@ if (!class_exists('AW\WSS\Formatter')) {
          * Start Date of the Report
          * @var null|\DateTimeImmutable
          */
-        protected $startDate = null;
+        public $startDate = null;
 
         /**
          * End Date of the Report
          * @var null|\DateTimeImmutable
          */
-        protected $endDate = null;
+        public $endDate = null;
 
         /**
          * UPC WC Attribute Name
