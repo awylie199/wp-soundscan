@@ -1,6 +1,7 @@
 const path = require('path'),
     webpack = require('webpack'),
     ExtractTextPlugin = require('extract-text-webpack-plugin'),
+    CopyWebpackPlugin = require('copy-webpack-plugin'),
     CleanWebpackPlugin = require('clean-webpack-plugin');
 const plugins = [
     new webpack.DefinePlugin({
@@ -17,6 +18,10 @@ const plugins = [
     ], {
         exclude: ['index.php']
     }),
+    new CopyWebpackPlugin([{
+        from: path.join(__dirname, 'assets/bear.svg'),
+        to: path.join(__dirname, 'dist')
+    }]),
 ];
 const entry = [
     path.join(__dirname, 'assets/main.js'),

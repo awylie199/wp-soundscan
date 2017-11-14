@@ -371,12 +371,12 @@ if (!class_exists('AW\WSS\Settings')) {
                 ],
                 'ftpHost'           =>  [
                     'title'             => __(
-                        '(S)FTP Host',
+                        'FTP Host Address',
                         'woocommerce-soundscan'
                     ),
                     'type'              => 'text',
                     'description'       => __(
-                        'The Nielsen (S)FTP address, beginning with ftp:// or ftps://.',
+                        'The Nielsen FTP address, beginning with "ftps://" or "sftp://".',
                         'woocommerce-soundscan'
                     ),
                     'desc_tip'          => true,
@@ -736,7 +736,7 @@ if (!class_exists('AW\WSS\Settings')) {
             if (isset($settings[self::FTP_HOST])) {
                 $cleanSettings[self::FTP_HOST] = esc_url_raw(
                     $settings[self::FTP_HOST],
-                    ['ftp', 'ftps']
+                    ['ftps', 'sftp']
                 );
             }
 
@@ -879,10 +879,11 @@ if (!class_exists('AW\WSS\Settings')) {
          */
         public function validate_ftpHost_field(string $key, string $value = ''): string
         {
-            if (!empty($value) && preg_match('/^ftps?:\/\//', $value) !== 1) {
+            if (!empty($value) && (preg_match('/^ftps:\/\//', $value) !== 1) &&
+                preg_match('/^sftp:\/\//', $value) !== 1) {
                 \WC_Admin_Settings::add_error(
                     __(
-                        'The FTP Host must start with ftps:// or ftp://',
+                        'The FTP Host must start with "ftps://" or "sftp://".',
                         'woocommerce-soundscan'
                     )
                 );

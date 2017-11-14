@@ -1,3 +1,4 @@
+import 'babel-polyfill';
 import './main.scss';
 import moment from 'moment';
 
@@ -48,7 +49,7 @@ import moment from 'moment';
                             if (response.hasOwnProperty('success') &&
                                     response.success === true &&
                                     response.hasOwnProperty('data')) {
-                                $output.html(response.data);
+                                $output.replaceWith(response.data);
                             } else {
                                 throw new Error();
                             }

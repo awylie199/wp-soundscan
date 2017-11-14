@@ -148,8 +148,7 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
         {
             return !(
                 empty($this->isrcAttribute) || empty($this->musicCategory) ||
-                empty($this->idAttribute) || empty($this->accountNo) ||
-                empty($this->chainNo)
+                empty($this->accountNo) ||empty($this->chainNo)
             );
         }
 

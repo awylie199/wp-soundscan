@@ -60,6 +60,20 @@ $green: #46b450;
     display: none;
 }
 
+.wss-fb-logo {
+    width: 40px;
+}
+
+.wss-about-fb {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+}
+
+.wss-about-fb__text {
+    padding-right: 2em;
+}
+
 .wp-core-ui .wss-export-btn {
     margin-top: 1em;
 }

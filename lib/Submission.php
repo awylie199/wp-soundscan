@@ -86,7 +86,7 @@ if (!class_exists('\AW\WSS\Submission')) {
          */
         public function hasNecessaryOptions(): bool
         {
-            return (!empty($this->ftpLogin) && !empty($this->ftpLogin) &&
+            return (!empty($this->ftpHost) && !empty($this->ftpLogin) &&
                 !empty($this->ftpPwd) && !empty($this->accountNo));
         }
 
@@ -107,15 +107,15 @@ if (!class_exists('\AW\WSS\Submission')) {
             foreach ($logs as $log) {
                 if ($log['type'] === $this->formatter::FORMATTER_TYPE &&
                     $log['result'] === true) {
-                        $logDate = \DateTimeImmutable::createFromFormat(
-                            self::LOGS_DATE_FORMAT,
-                            $log['date']
-                            );
+                $logDate = \DateTimeImmutable::createFromFormat(
+                    self::LOGS_DATE_FORMAT,
+                    $log['date']
+                    );
 
-                        return ($logDate > $this->formatter->startDate &&
-                            $logDate < $this->formatter->endDate);
-                    }
+                return ($logDate > $this->formatter->startDate &&
+                    $logDate < $this->formatter->endDate);
             }
+        }
 
             return false;
         }
@@ -131,7 +131,7 @@ if (!class_exists('\AW\WSS\Submission')) {
             $this->logger->notice(
                 __('Starting Soundscan upload', 'woocommerce-soundscan'),
                 $this->context
-                );
+            );
 
             try {
                 $this->connect();
@@ -184,36 +184,49 @@ if (!class_exists('\AW\WSS\Submission')) {
          */
         private function setConnectionDetails()
         {
-            $this->ftpHost = get_option(Settings::FTP_HOST, '');
+            $options = get_option(Settings::NAME, '');
+
+            if (is_string($options)) {
+                $options = unserialize($options);
+            }
+
+            $ftp = str_replace('ftps://', '', $options[Settings::FTP_HOST] ?? '');
+            $this->ftpHost = str_replace('sftp://', '', $ftp);
 
             if ($this->formatter::FORMATTER_TYPE === 'physical') {
-                $this->ftpLogin = get_option(Settings::LOGIN_PHYSICAL_NAME, '');
-                $this->ftpPwd = get_option(Settings::LOGIN_PHYSICAL_PWD, '');
-                $this->accountNo = get_option(Settings::ACCOUNT_NO_PHYSICAL, '');
+                $this->ftpLogin = $options[Settings::LOGIN_PHYSICAL_NAME] ?? '';
+                $this->ftpPwd = $options[Settings::LOGIN_PHYSICAL_PWD] ?? '';
+                $this->accountNo = $options[Settings::ACCOUNT_NO_PHYSICAL] ?? '';
             } else {
-                $this->ftpLogin = get_option(Settings::LOGIN_DIGITAL_NAME, '');
-                $this->ftpPwd = get_option(Settings::LOGIN_DIGITAL_PWD, '');
-                $this->accountNo = get_option(Settings::ACCOUNT_NO_DIGITAL, '');
+                $this->ftpLogin = $options[Settings::LOGIN_DIGITAL_NAME] ?? '';
+                $this->ftpPwd = $options[Settings::LOGIN_DIGITAL_PWD] ?? '';
+                $this->accountNo = $options[Settings::ACCOUNT_NO_DIGITAL] ?? '';
             }
         }
 
         /**
          * Connect to Nielsen Soundscan
+         * @throws \Exception if unable to connect to SFTP server
          * @return void
          */
         private function connect()
         {
             $this->logger->info(
-                __('Connecting to Nielsen Soundscan', 'woocommerce-soundscan'),
+                __('Connecting to Nielsen Soundscan SFTP Server', 'woocommerce-soundscan'),
                 $this->context
             );
             $this->sftpConnection = new SFTP($this->ftpHost);
 
             if (!$this->sftpConnection->login($this->ftpLogin, $this->ftpPwd)) {
                 throw new \Exception(
-                    'Unable to connect to Soundscan Nielsen FTP Server'
+                    'Unable to connect to Soundscan Nielsen SFTP Server'
                 );
             }
+
+            $this->logger->info(
+                __('Connected to Nielsen Soundscan SFTP Server', 'woocommerce-soundscan'),
+                $this->context
+            );
         }
 
         /**

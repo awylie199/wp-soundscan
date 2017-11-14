@@ -190,6 +190,7 @@ if (!class_exists('AW\WSS\Menu')) {
                 <?php
                 if (empty($this->tab) || $this->tab === 'physical' || $this->tab === 'digital') {
                     $this->outputResultsHTML();
+                    $this->outputManualUploadHTML();
                 } elseif ($this->tab === 'logs') {
                     $this->outputLogsHTML();
                 } else {
@@ -236,6 +237,8 @@ if (!class_exists('AW\WSS\Menu')) {
          */
         public function handleDatesChange()
         {
+            $this->logger = wc_get_logger();
+
             if (current_user_can('manage_options')) {
                 $name = $_GET[self::MENU_NONCE_NAME] ?? '';
 
@@ -282,6 +285,8 @@ if (!class_exists('AW\WSS\Menu')) {
          */
         public function handleUpload()
         {
+            $this->logger = wc_get_logger();
+
             if (current_user_can('manage_options')) {
                 $name = $_GET[self::MENU_NONCE_NAME] ?? '';
                 $errorCode = 0;
@@ -295,11 +300,7 @@ if (!class_exists('AW\WSS\Menu')) {
                             $submitter = new Submission($this->formatter);
 
                             if ($submitter->hasNecessaryOptions()) {
-                                if (!$submitter->isAlreadyUploaded()) {
-                                    $successful = $submitter->upload();
-                                } else {
-                                    throw new \Exception('An upload has already been made for this week.', 1);
-                                }
+                                $successful = $submitter->upload();
                             } else {
                                 throw new \Exception('The report lacks the necessary details.', 2);
                             }
@@ -307,7 +308,7 @@ if (!class_exists('AW\WSS\Menu')) {
                             throw new \Exception('The report lacks the necessary details.', 2);
                         }
                     } catch (\Exception $err) {
-                        $this->logger(
+                        $this->logger->error(
                             sprintf(
                                 __(
                                     'Error in Soundscan Manual Upload: %s',
@@ -320,10 +321,10 @@ if (!class_exists('AW\WSS\Menu')) {
                         $errorCode = $err->getCode();
                     } finally {
                         $url = add_query_arg([
-                            'page'          =>  'soundscan',
-                            'tab'           =>  $this->tab,
-                            'successful'    =>  $successful,
-                            'errorCode'       =>  $errorCode
+                            'page'              =>  'soundscan',
+                            'tab'               =>  $this->tab,
+                            'successful'        =>  $successful,
+                            'errorCode'         =>  $errorCode
                         ], esc_url(admin_url('admin.php')));
                         wp_safe_redirect($url);
                     }
@@ -344,7 +345,7 @@ if (!class_exists('AW\WSS\Menu')) {
         {
             $class = 'nav-tab';
 
-            if ($this->tab === $tab) {
+            if ($this->tab === $tab || $tab === 'physical' && empty($this->tab)) {
                 $class .= ' nav-tab-active';
             }
 
@@ -439,7 +440,8 @@ if (!class_exists('AW\WSS\Menu')) {
          * Output HTML for the Formatted Soundscan Results (or Lack Of)
          * @return void
          */
-        private function outputTableHTML() {
+        private function outputTableHTML()
+        {
             $rows = $this->formatter->getFormattedResults();
             $downloadURL = add_query_arg(
                 'action',
@@ -449,16 +451,6 @@ if (!class_exists('AW\WSS\Menu')) {
             $downloadURL = wp_nonce_url(
                 $downloadURL,
                 self::DOWNLOAD_REPORT_ACTION,
-                self::MENU_NONCE_NAME
-            );
-            $uploadURL = add_query_arg(
-                'action',
-                self::UPLOAD_REPORT_ACTION,
-                admin_url('admin-post.php')
-            );
-            $uploadURL = wp_nonce_url(
-                $uploadURL,
-                self::UPLOAD_REPORT_ACTION,
                 self::MENU_NONCE_NAME
             );
 
@@ -572,6 +564,26 @@ if (!class_exists('AW\WSS\Menu')) {
                 <?php endif; ?>
             <?php endif; ?>
            </div>
+            <?php
+        }
+
+        /**
+         * Output HTML for Manual Uploads
+         * @return void
+         */
+        private function outputManualUploadHTML()
+        {
+            $uploadURL = add_query_arg(
+                'action',
+                self::UPLOAD_REPORT_ACTION,
+                admin_url('admin-post.php')
+            );
+            $uploadURL = wp_nonce_url(
+                $uploadURL,
+                self::UPLOAD_REPORT_ACTION,
+                self::MENU_NONCE_NAME
+            );
+            ?>
            <hr />
            <div>
                 <h3>
@@ -581,7 +593,7 @@ if (!class_exists('AW\WSS\Menu')) {
                 <?php
                 printf(
                     __(
-                        'Upload this week\'s report? To undo this action you must %1$smanually delete%2$s the file from Nielsen\'s FTP server.',
+                        'Upload this week\'s report? This will %1$soverwrite%2$s any existing file on Nielsen\'s FTP server.',
                         'woocommerce-soundscan'
                     ),
                     '<strong>',
@@ -602,7 +614,7 @@ if (!class_exists('AW\WSS\Menu')) {
                         'The report was not uploaded. Please complete your Soundscan %1$ssettings%2$s to upload successfully.',
                         'woocommerce-soundscan'
                     ),
-                    '<a href="' . Notifications::getSettingsURL() . '">',
+                    '<a href="' . esc_url(Notifications::getSettingsURL()) . '">',
                     '</a>'
                 );
                 ?>
@@ -813,7 +825,7 @@ if (!class_exists('AW\WSS\Menu')) {
             <p>
             <?php _e('Check your WooCommerce logs for more detail on unsuccessful submissions', 'woocommerce-soundscan'); ?>
             </p>
-            <table>
+            <table class="table widefat">
                 <thead>
                     <tr>
                         <th>
@@ -878,26 +890,31 @@ if (!class_exists('AW\WSS\Menu')) {
             <h4>
             <?php _e('Contact', 'woocommerce-soundscan'); ?>
             </h4>
-            <p>
-            <?php _e('The plugin was created by FuzzyBears, a UK web development team.', 'woocommerce-soundscan'); ?>
-            </p>
-            <p>
-            <?php
-               printf(
-                   __(
-                       'If we can help with this plugin, please do not hesitate to contact us at %1$shi@fuzzybears.co.uk%2$s. We\'re also available for work.',
-                       'woocommerce-soundscan'
-                   ),
-                   '<a href="mailto:hi@fuzzybears.co.uk">',
-                   '</a>'
-               );
-            ?>
-            </p>
-            <address>
-                <a href="https://fuzzybears.co.uk">
-                <?php _e('https://fuzzybears.co.uk', 'woocommerce-soundscan'); ?>
-                </a>
-            </address>
+            <div class="wss-about-fb">
+                <div class="wss-about-fb__text">
+                    <p>
+                    <?php _e('The plugin was created by FuzzyBears, a UK web development team: ', 'woocommerce-soundscan'); ?>
+                        <a href="https://fuzzybears.co.uk">
+                            <?php _e('https://fuzzybears.co.uk', 'woocommerce-soundscan'); ?>
+                        </a>
+                    </p>
+                    <p>
+                    <?php
+                       printf(
+                           __(
+                               'If we can help with this plugin, or you notice a bug, please do not hesitate to scontact us at %1$shi@fuzzybears.co.uk%2$s. We\'re also %3$savailable for work%4$s.',
+                               'woocommerce-soundscan'
+                           ),
+                           '<a href="mailto:hi@fuzzybears.co.uk">',
+                           '</a>',
+                           '<a href="https://fuzzybears.co.uk">',
+                           '</a>'
+                       );
+                    ?>
+                    </p>
+                </div>
+                <img class="wss-fb-logo" src="<?php esc_url(plugin_dir_url(WC_SOUNDSCAN_DIR)); ?>/wp-content/plugins/woocommerce-soundscan/dist/bear.svg" alt="<?php _e('FuzzyBears Logo', 'fb'); ?>" />
+            </div>
             <hr />
             <h4>
             <?php _e('Physical Format', 'woocommerce-soundscan'); ?>

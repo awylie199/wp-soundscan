@@ -139,8 +139,8 @@ if (!class_exists('AW\WSS\PhysicalFormatter')) {
         public function hasNecessaryOptions(): bool
         {
             return !(
-                empty($this->musicCategory) || empty($this->idAttribute) ||
-                empty($this->accountNo) || empty($this->chainNo)
+                empty($this->musicCategory) || empty($this->accountNo) ||
+                empty($this->chainNo)
             );
         }
 
