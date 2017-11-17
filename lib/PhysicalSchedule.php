@@ -72,6 +72,7 @@ if (!class_exists('\AW\WSS\PhysicalSchedule')) {
          * Activate Physical WP Scheduled Events for Submitting Digital Soundscan Reports
          * {@inheritDoc}
          * @see \AW\WSS\Schedule::activate()
+         * @return void
          */
         public function activate()
         {
@@ -97,6 +98,7 @@ if (!class_exists('\AW\WSS\PhysicalSchedule')) {
          * Deactivate Physical WP Scheduled Events for Submitting Digital Soundscan Reports
          * {@inheritDoc}
          * @see \AW\WSS\Schedule::deactivate()
+         * @return void
          */
         public function deactivate()
         {

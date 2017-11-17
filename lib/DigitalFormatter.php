@@ -165,22 +165,22 @@ if (!class_exists('AW\WSS\DigitalFormatter')) {
          * Type of Sale ('album' or 'track') (1)
          * Strata (PC = P or Mobile = M) (1) This info is not available in WC - fix as 'P'
          *
-         * @param string $ean=''           Product EAN / UPC Number
          * @param string $zip              Customer ZIP Code
          * @param string $status           WooCommerce Order Status
          * @param string $price            Line Item Price
          * @param int    $itemCount        Sequential Order of Item Within Order
          * @param string $type             Type of Item (Album / Track)
+         * @param string $ean=''           Product EAN / UPC Number
          * @return void
          */
         protected function addRecord(
-            string $ean = '',
             string $zip,
             string $status,
             string $price,
             int $itemCount,
             string $type,
-            string $isrc
+            string $isrc,
+            string $ean = ''
         ) {
             $complete = ($status === 'completed');
 

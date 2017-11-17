@@ -374,7 +374,8 @@ if (!class_exists('AW\WSS\Menu')) {
             $this->setFormatterAndDates();
             $url = wp_nonce_url(
                 admin_url('admin-ajax.php'),
-                self::DATES_CHANGE_ACTION, self::MENU_NONCE_NAME
+                self::DATES_CHANGE_ACTION,
+                self::MENU_NONCE_NAME
             );
             $url = add_query_arg('action', self::DATES_CHANGE_ACTION, $url);
             $dateFormat = get_option('date_format');
@@ -524,10 +525,10 @@ if (!class_exists('AW\WSS\Menu')) {
                         <tr>
                             <td>
                                 <?php
-                               printf(
-                                   esc_html__('%d', 'woocommerce-soundscan'),
-                                   $row['record']->get_order_id()
-                               );
+                                printf(
+                                    esc_html__('%d', 'woocommerce-soundscan'),
+                                    $row['record']->get_order_id()
+                                );
                                ?>
                             </td>
                             <td>
@@ -583,11 +584,12 @@ if (!class_exists('AW\WSS\Menu')) {
                 self::UPLOAD_REPORT_ACTION,
                 self::MENU_NONCE_NAME
             );
+            $dateFormat = get_option('date_format', 'm-d-Y');
             ?>
            <hr />
            <div>
                 <h3>
-                <?php _e('Manual Upload', 'woocommerce-soundscan'); ?>
+                <?php _e('Upload', 'woocommerce-soundscan'); ?>
                 </h3>
                 <p>
                 <?php
@@ -602,7 +604,20 @@ if (!class_exists('AW\WSS\Menu')) {
                 ?>
                 </p>
                 <p>
-                <?php _e('If the upload is successful, it will not be uploaded automatically for this week.', 'woocommerce-soundscan'); ?>
+                <?php
+                printf(
+                    __(
+                        'Reports must be submitted by %1$s1PM %2$s EST%3$s',
+                        'woocommerce-soundscan'
+                    ),
+                    '<strong>',
+                    $this->type === 'physical' ? PhysicalSchedule::SUBMIT_DAY : DigitalSchedule::SUBMIT_DAY,
+                    '</strong>'
+                );
+                ?>
+                </p>
+                <p>
+                <?php //_e('If the upload is successful, it will not be uploaded automatically for this week.', 'woocommerce-soundscan'); ?>
                 </p>
                 <a class="button button-primary" href="<?php echo esc_url($uploadURL); ?>">
                 <?php _e('Upload', 'woocommerce-soundscan') ?>
@@ -725,7 +740,7 @@ if (!class_exists('AW\WSS\Menu')) {
                 $char = $format[$i];
 
                 // PHP date format escaping character
-                if($char === '\\') {
+                if ($char === '\\') {
                     $i++;
 
                     if ($escaping) {
@@ -902,7 +917,7 @@ if (!class_exists('AW\WSS\Menu')) {
                     <?php
                        printf(
                            __(
-                               'If we can help with this plugin, or you notice a bug, please do not hesitate to scontact us at %1$shi@fuzzybears.co.uk%2$s. We\'re also %3$savailable for work%4$s.',
+                               'If we can help with this plugin, or you notice a bug, please do not hesitate to contact us at %1$shi@fuzzybears.co.uk%2$s. We\'re also %3$savailable for work%4$s.',
                                'woocommerce-soundscan'
                            ),
                            '<a href="mailto:hi@fuzzybears.co.uk">',

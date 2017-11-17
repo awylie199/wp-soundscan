@@ -32,13 +32,13 @@ if (!class_exists('AW\WSS\Settings')) {
          * Option Name for Submitting Digital Reports via Cron
          * @var string
          */
-        const CRON_DIGITAL_SUBMISSIONS = 'cronDigitalSubmissions';
+        // const CRON_DIGITAL_SUBMISSIONS = 'cronDigitalSubmissions';
 
         /**
          *Option Name for Submitting Physical Reports via Cron
          * @var string
          */
-        const CRON_PHYSICAL_SUBMISSIONS = 'cronPhysicalSubmissions';
+        // const CRON_PHYSICAL_SUBMISSIONS = 'cronPhysicalSubmissions';
 
         /**
          * Option Name for FTP Host
@@ -164,13 +164,13 @@ if (!class_exists('AW\WSS\Settings')) {
          * Whether to Submit Digital Reports Automatically by Cron Scheduling
          * @var bool
          */
-        private $cronDigitalSubmissions = false;
+        // private $cronDigitalSubmissions = false;
 
         /**
          * Whether to Submit Physical Reports Automatically by Cron Scheduling
          * @var bool
          */
-        private $cronPhysicalSubmissions = false;
+        // private $cronPhysicalSubmissions = false;
 
         /**
          * Nielsen Soundscan Physical Sales Login Username
@@ -293,8 +293,8 @@ if (!class_exists('AW\WSS\Settings')) {
             $this->isrcAttribute = $this->get_option(self::ISRC_ATTRIBUTE, '');
             $this->eanAttribute = $this->get_option(self::EAN_ATTRIBUTE, '');
             $this->upcAttribute = $this->get_option(self::UPC_ATTRIBUTE, '');
-            $this->cronDigitalSubmissions = $this->get_option(self::CRON_DIGITAL_SUBMISSIONS, false);
-            $this->cronPhysicalSubmissions= $this->get_option(self::CRON_PHYSICAL_SUBMISSIONS, false);
+            // $this->cronDigitalSubmissions = $this->get_option(self::CRON_DIGITAL_SUBMISSIONS, false);
+            // $this->cronPhysicalSubmissions= $this->get_option(self::CRON_PHYSICAL_SUBMISSIONS, false);
 
             add_action(
                 'woocommerce_update_options_integration_' . $this->id,
@@ -304,7 +304,7 @@ if (!class_exists('AW\WSS\Settings')) {
                 'woocommerce_settings_api_sanitized_fields_' . $this->id,
                 [$this, 'sanitizeOptions']
             );
-            add_action('update_option_' . self::NAME, [$this, 'handleSave']);
+            // add_action('update_option_' . self::NAME, [$this, 'handleSave']);
         }
 
         /**
@@ -312,31 +312,32 @@ if (!class_exists('AW\WSS\Settings')) {
          * @param mixed[] $oldValue             Old Option Values
          * @return void
          */
-        public function handleSave(array $oldValue)
-        {
-            $newOptions = get_option(self::NAME);
-            $digitalSchedule = DigitalSchedule::instance();
-            $physicalSchedule = PhysicalSchedule::instance();
+        // public function handleSave(array $oldValue)
+        // {
+            // $newOptions = get_option(self::NAME);
+            // $digitalSchedule = DigitalSchedule::instance();
+            // $physicalSchedule = PhysicalSchedule::instance();
 
-            if (is_array($newOptions)) {
-                $digitalOption = $newOptions['cronDigitalSubmissions'] ?? '';
-                $physicalOption = $newOptions['cronPhysicalSubmissions'] ?? '';
+            // if (is_array($newOptions)) {
+            //     $digitalOption = $newOptions['cronDigitalSubmissions'] ?? '';
+            //     $physicalOption = $newOptions['cronPhysicalSubmissions'] ?? '';
 
-                if ($digitalOption === 'yes') {
-                    $digitalSchedule->activate();
-                } else {
-                }   $digitalSchedule->deactivate();
+            //     if ($digitalOption === 'yes') {
+            //         $digitalSchedule->activate();
+            //     } elseif ($digitalOption === 'no') {
+            //         $digitalSchedule->deactivate();
+            //     }
 
-                if ($physicalOption === 'yes') {
-                    $physicalSchedule->activate();
-                } else {
-                    $physicalSchedule->deactivate();
-                }
-            } else {
-                $digitalSchedule->deactivate();
-                $physicalSchedule->deactivate();
-            }
-        }
+            //     if ($physicalOption === 'yes') {
+            //         $physicalSchedule->activate();
+            //     } elseif ($physicalOption === 'no') {
+            //         $physicalSchedule->deactivate();
+            //     }
+            // } else {
+            //     $digitalSchedule->deactivate();
+            //     $physicalSchedule->deactivate();
+            // }
+        // }
 
         /**
          * Initialize Woocommerce Soundscan Settings
@@ -345,30 +346,30 @@ if (!class_exists('AW\WSS\Settings')) {
         public function initFormFields()
         {
             $this->form_fields = [
-                'cronDigitalSubmissions'   =>  [
-                    'title'             => __(
-                        'Submit Digital Reports Automatically Each Week?',
-                        'woocommerce-soundscan'
-                    ),
-                    'type'              => 'checkbox',
-                    'description'       => __(
-                        'Digital reports are sent weekly, from Monday to Sunday, and must be submitted on Monday before 1PM EST.',
-                        'woocommerce-soundscan'
-                    ),
-                    'desc_tip'          => true,
-                ],
-                'cronPhysicalSubmissions'   =>  [
-                    'title'             => __(
-                        'Submit Physical Reports Automatically Each Week?',
-                        'woocommerce-soundscan'
-                    ),
-                    'type'              => 'checkbox',
-                    'description'       => __(
-                        'Physical reports are weekly, from Tuesday to Monday, and must be submitted on Tuesday before 1PM EST.',
-                        'woocommerce-soundscan'
-                    ),
-                    'desc_tip'          => true,
-                ],
+                // 'cronDigitalSubmissions'   =>  [
+                //     'title'             => __(
+                //         'Submit Digital Reports Automatically Each Week?',
+                //         'woocommerce-soundscan'
+                //     ),
+                //     'type'              => 'checkbox',
+                //     'description'       => __(
+                //         'Digital reports are sent weekly, from Monday to Sunday, and must be submitted on Monday before 1PM EST.',
+                //         'woocommerce-soundscan'
+                //     ),
+                //     'desc_tip'          => true,
+                // ],
+                // 'cronPhysicalSubmissions'   =>  [
+                //     'title'             => __(
+                //         'Submit Physical Reports Automatically Each Week?',
+                //         'woocommerce-soundscan'
+                //     ),
+                //     'type'              => 'checkbox',
+                //     'description'       => __(
+                //         'Physical reports are weekly, from Tuesday to Monday, and must be submitted on Tuesday before 1PM EST.',
+                //         'woocommerce-soundscan'
+                //     ),
+                //     'desc_tip'          => true,
+                // ],
                 'ftpHost'           =>  [
                     'title'             => __(
                         'FTP Host Address',
@@ -847,26 +848,26 @@ if (!class_exists('AW\WSS\Settings')) {
                 ), 2);
             }
 
-            if (isset($settings[self::CRON_DIGITAL_SUBMISSIONS])) {
-               $value = 'no';
+            // if (isset($settings[self::CRON_DIGITAL_SUBMISSIONS])) {
+            //     $value = 'no';
 
-                if ($settings[self::CRON_DIGITAL_SUBMISSIONS] === 'yes') {
-                    $value = 'yes';
-                }
+            //     if ($settings[self::CRON_DIGITAL_SUBMISSIONS] === 'yes') {
+            //         $value = 'yes';
+            //     }
 
-                $cleanSettings[self::CRON_DIGITAL_SUBMISSIONS] = $value;
-            }
+            //     $cleanSettings[self::CRON_DIGITAL_SUBMISSIONS] = $value;
+            // }
 
-            if (isset($settings[self::CRON_PHYSICAL_SUBMISSIONS])) {
-               $value = 'no';
+            // if (isset($settings[self::CRON_PHYSICAL_SUBMISSIONS])) {
+            //     $value = 'no';
 
-                if ($settings[self::CRON_PHYSICAL_SUBMISSIONS] === 'yes') {
-                    $value = 'yes';
-                }
+            //     if ($settings[self::CRON_PHYSICAL_SUBMISSIONS] === 'yes') {
+            //         $value = 'yes';
+            //     }
 
 
-                $cleanSettings[self::CRON_PHYSICAL_SUBMISSIONS] = $value;
-            }
+            //     $cleanSettings[self::CRON_PHYSICAL_SUBMISSIONS] = $value;
+            // }
 
             return $cleanSettings;
         }

@@ -41,7 +41,7 @@ if (!class_exists('AW\WSS\Notifications')) {
             }
 
             add_action('admin_notices', [$this, 'suggestIntegration']);
-            add_action('admin_notices', [$this, 'suggestActivation']);
+            // add_action('admin_notices', [$this, 'suggestActivation']);
         }
 
         /**

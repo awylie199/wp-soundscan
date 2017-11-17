@@ -28,24 +28,23 @@ if (!class_exists('\AW\WSS\Schedule')) {
         protected $logger = null;
 
         /**
+         * WooCommerce Logger Context for Soundscan
+         * @var string[]
+         */
+        protected $context = [
+            'source'    =>  'soundscan'
+        ];
+
+        /**
          * Short Name of Called Schedule Class
          * @var string
          */
         private $className = '';
 
-        /**
-         * WooCommerce Logger Context for Soundscan
-         * @var string[]
-         */
-        private $context = [
-            'source'    =>  'soundscan'
-        ];
-
         protected function __construct()
         {
             $this->logger = wc_get_logger();
             $this->className = (new \ReflectionClass(static::class))->getShortName();
-            add_action(static::SCHEDULE_ACTION, [$this, 'scheduleSubmission'], 1);
         }
 
         /**
@@ -54,8 +53,9 @@ if (!class_exists('\AW\WSS\Schedule')) {
          */
         public function scheduleSubmission()
         {
-            if ($this->isTimeToSubmit()) {
-                try {
+            $this->logger->debug('Executing scheduled submission');
+            try {
+                if ($this->isTimeToSubmit()) {
                     $formatter = $this->createFormatter();
 
                     if ($formatter->hasNecessaryOptions()) {
@@ -79,18 +79,18 @@ if (!class_exists('\AW\WSS\Schedule')) {
                     } else {
                         throw new \Exception('Formatter lacks necessary setting details to upload.');
                     }
-                } catch (\Exception $err) {
-                    $this->logger->error(
-                        sprintf(
-                            __(
-                                'Error in Soundscan Schedule: %s',
-                                'woocommerce-soundscan'
-                            ),
-                            $err->getMessage()
-                        ),
-                        $this->context
-                    );
                 }
+            } catch (\Exception $err) {
+                $this->logger->error(
+                    sprintf(
+                        __(
+                            'Error in Soundscan Schedule: %s',
+                            'woocommerce-soundscan'
+                            ),
+                        $err->getMessage()
+                        ),
+                    $this->context
+                );
             }
         }
 

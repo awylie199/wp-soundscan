@@ -82,7 +82,7 @@ if (!class_exists('\AW\WSS\DigitalSchedule')) {
                     self::SCHEDULE_ACTION
                 );
 
-                if ($active !== true) {
+                if ($active === false) {
                     $this->logger->error(
                         __('Unable to Schedule Digital Soundscan Event', 'woocommerce-soundscan'),
                         $this->context

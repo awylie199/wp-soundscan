@@ -8,6 +8,8 @@ if (!defined('ABSPATH')) {
 use AW\WSS\Settings;
 use AW\WSS\Notifications;
 use AW\WSS\Menu;
+use AW\WSS\DigitalSchedule;
+use AW\WSS\PhysicalSchedule;
 
 if (!class_exists('AW\WSS\Setup')) {
     /**
@@ -35,6 +37,16 @@ if (!class_exists('AW\WSS\Setup')) {
             new Settings();
             new Notifications();
             new Menu();
+            $digitalSchedule = DigitalSchedule::instance();
+            $physicalSchedule = PhysicalSchedule::instance();
+            add_action(
+                DigitalSchedule::SCHEDULE_ACTION,
+                [$digitalSchedule, 'scheduleSubmission']
+            );
+            add_action(
+                PhysicalSchedule::SCHEDULE_ACTION,
+                [$physicalSchedule, 'scheduleSubmission']
+            );
         }
 
         /**
