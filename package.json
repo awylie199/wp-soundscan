@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "WordPress plugin for uploading music sales from WooCommerce to Nielsen SoundScan.",
   "main": "assets/main.js",
-  "repository": "awylie199@bitbucket.org:awylie199/woocommerce-soundscan.git",
+  "repository": "git@github.com:awylie199/wp-soundscan.git",
   "author": "Alexander Wylie <awylie199@gmail.com>",
   "license": "GPL 3.0",
   "private": true,

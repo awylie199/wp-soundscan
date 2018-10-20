@@ -908,27 +908,12 @@ if (!class_exists('AW\WSS\Menu')) {
             <div class="wss-about-fb">
                 <div class="wss-about-fb__text">
                     <p>
-                    <?php _e('The plugin was created by FuzzyBears, a UK web development team: ', 'woocommerce-soundscan'); ?>
-                        <a href="https://fuzzybears.co.uk">
-                            <?php _e('https://fuzzybears.co.uk', 'woocommerce-soundscan'); ?>
+                    <?php _e('The plugin was created by Alex Wylie', 'woocommerce-soundscan'); ?>
+                        <a href="https://alexwylie.com">
+                            <?php _e('https://alexwylie.com', 'woocommerce-soundscan'); ?>
                         </a>
                     </p>
-                    <p>
-                    <?php
-                       printf(
-                           __(
-                               'If we can help with this plugin, or you notice a bug, please do not hesitate to contact us at %1$shi@fuzzybears.co.uk%2$s. We\'re also %3$savailable for work%4$s.',
-                               'woocommerce-soundscan'
-                           ),
-                           '<a href="mailto:hi@fuzzybears.co.uk">',
-                           '</a>',
-                           '<a href="https://fuzzybears.co.uk">',
-                           '</a>'
-                       );
-                    ?>
-                    </p>
                 </div>
-                <img class="wss-fb-logo" src="<?php esc_url(plugin_dir_url(WC_SOUNDSCAN_DIR)); ?>/wp-content/plugins/woocommerce-soundscan/dist/bear.svg" alt="<?php _e('FuzzyBears Logo', 'fb'); ?>" />
             </div>
             <hr />
             <h4>
